@@ -12,10 +12,15 @@ from ..log_conf import log
 
 # ------------------------------------------------------------------------------------------------------------- #
 # for testing purposes
-import torch 
+import torch
 device = torch.device('cuda')
 assert torch.cuda.is_available, f"CUDE not available"
-torch.backends.cuda.matmul.allow_tf32 = True # Enable/disable TF32 for matrix multiplications
+torch.backends.cuda.matmul.allow_tf32 = True  # Enable/disable TF32 for matrix multiplications
+
+global_GPU_flag = True
+
+# this should probably be an kwargs/args at some later point once we do this properly
+einsum_func = np.einsum if not global_GPU_flag else torch.einsum
 
 torch.set_default_dtype(torch.float32)
 if True:
@@ -23,9 +28,11 @@ if True:
 
 # ------------------------------------------------------------------------------------------------------------- #
 
+
 def move_to_GPU(x):
     """ temp func for easy cProfile tracking """
     return x.to()
+
 
 def move_to_CPU(x):
     """ temp func for easy cProfile tracking """
@@ -39,29 +46,29 @@ def move_to_CPU(x):
 
 
 # -------------- operator(name='', rank=0, m=0, n=0) TERMS -------------- #
-def add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='', rank=0, m=0, n=0) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
     """
 
     if ansatz.ground_state:
-        R += np.einsum('ac, c -> a', h_args[(0, 0)], z_args[(0, 0)])
+        R += einsum_func('ac, c -> a', h_args[(0, 0)], z_args[(0, 0)])
 
         if truncation.h_at_least_linear:
             if truncation.z_at_least_linear:
-                R += np.einsum('aci, ci -> a', h_args[(0, 1)], z_args[(1, 0)])
+                R += einsum_func('aci, ci -> a', h_args[(0, 1)], z_args[(1, 0)])
 
         if truncation.h_at_least_quadratic:
             if truncation.z_at_least_quadratic:
-                R += (1 / 2) * np.einsum('acij, cij -> a', h_args[(0, 2)], z_args[(2, 0)])
+                R += (1 / 2) * einsum_func('acij, cij -> a', h_args[(0, 2)], z_args[(2, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
     return
 
 
-def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='', rank=0, m=0, n=0) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -70,42 +77,42 @@ def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
     if ansatz.ground_state:
         if truncation.t_singles:
             if truncation.z_at_least_linear:
-                R += np.einsum('i, ac, ci -> a', t_args[(0, 1)], h_args[(0, 0)], z_args[(1, 0)])
+                R += einsum_func('i, ac, ci -> a', t_args[(0, 1)], h_args[(0, 0)], z_args[(1, 0)])
             if truncation.z_at_least_quadratic:
-                R += (1 / 2) * np.einsum('i, j, ac, cij -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 0)], z_args[(2, 0)])
+                R += (1 / 2) * einsum_func('i, j, ac, cij -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 0)], z_args[(2, 0)])
             if truncation.z_at_least_cubic:
-                R += (1 / 6) * np.einsum('i, j, k, ac, cijk -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 0)], z_args[(3, 0)])
+                R += (1 / 6) * einsum_func('i, j, k, ac, cijk -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_linear:
             if truncation.t_singles:
-                R += np.einsum('i, aci, c -> a', t_args[(0, 1)], h_args[(1, 0)], z_args[(0, 0)])
+                R += einsum_func('i, aci, c -> a', t_args[(0, 1)], h_args[(1, 0)], z_args[(0, 0)])
                 if truncation.z_at_least_linear:
                     R += (
-                        np.einsum('i, acij, cj -> a', t_args[(0, 1)], h_args[(1, 1)], z_args[(1, 0)]) +
-                        np.einsum('i, j, acj, ci -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(1, 0)])
+                        einsum_func('i, acij, cj -> a', t_args[(0, 1)], h_args[(1, 1)], z_args[(1, 0)]) +
+                        einsum_func('i, j, acj, ci -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(1, 0)])
                     )
                 if truncation.z_at_least_quadratic:
                     R += (
-                        np.einsum('i, acj, cij -> a', t_args[(0, 1)], h_args[(0, 1)], z_args[(2, 0)]) +
-                        np.einsum('i, j, acjk, cik -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(2, 0)])
+                        einsum_func('i, acj, cij -> a', t_args[(0, 1)], h_args[(0, 1)], z_args[(2, 0)]) +
+                        einsum_func('i, j, acjk, cik -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(2, 0)])
                     )
-                    R += (1 / 2) * np.einsum('i, j, k, ack, cij -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
+                    R += (1 / 2) * einsum_func('i, j, k, ack, cij -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
                 if truncation.z_at_least_cubic:
                     R += (1 / 2) * (
-                        np.einsum('i, j, ack, cijk -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 1)], z_args[(3, 0)]) +
-                        np.einsum('i, j, k, ackl, cijl -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)])
+                        einsum_func('i, j, ack, cijk -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 1)], z_args[(3, 0)]) +
+                        einsum_func('i, j, k, ackl, cijl -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)])
                     )
-                    R += (1 / 6) * np.einsum('i, j, k, l, acl, cijk -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                    R += (1 / 6) * einsum_func('i, j, k, l, acl, cijk -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_quadratic:
             if truncation.t_singles:
-                R += (1 / 2) * np.einsum('i, j, acij, c -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(0, 0)])
+                R += (1 / 2) * einsum_func('i, j, acij, c -> a', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(0, 0)])
                 if truncation.z_at_least_linear:
-                    R += (1 / 2) * np.einsum('i, j, k, acjk, ci -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
+                    R += (1 / 2) * einsum_func('i, j, k, acjk, ci -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
                 if truncation.z_at_least_quadratic:
-                    R += (1 / 4) * np.einsum('i, j, k, l, ackl, cij -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
+                    R += (1 / 4) * einsum_func('i, j, k, l, ackl, cij -> a', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
                 if truncation.z_at_least_cubic:
-                    R += (1 / 2) * np.einsum('i, acjk, cijk -> a', t_args[(0, 1)], h_args[(0, 2)], z_args[(3, 0)])
+                    R += (1 / 2) * einsum_func('i, acjk, cijk -> a', t_args[(0, 1)], h_args[(0, 2)], z_args[(3, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
@@ -117,7 +124,7 @@ def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
 
 # -------------- operator(name='b', rank=1, m=0, n=1) TERMS -------------- #
-def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='b', rank=1, m=0, n=1) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -125,25 +132,25 @@ def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
     if ansatz.ground_state:
         if truncation.z_at_least_linear:
-            R += np.einsum('ac, cz -> az', h_args[(0, 0)], z_args[(1, 0)])
+            R += einsum_func('ac, cz -> az', h_args[(0, 0)], z_args[(1, 0)])
 
         if truncation.h_at_least_linear:
-            R += np.einsum('acz, c -> az', h_args[(1, 0)], z_args[(0, 0)])
+            R += einsum_func('acz, c -> az', h_args[(1, 0)], z_args[(0, 0)])
             if truncation.z_at_least_linear:
-                R += np.einsum('aciz, ci -> az', h_args[(1, 1)], z_args[(1, 0)])
+                R += einsum_func('aciz, ci -> az', h_args[(1, 1)], z_args[(1, 0)])
             if truncation.z_at_least_quadratic:
-                R += np.einsum('aci, ciz -> az', h_args[(0, 1)], z_args[(2, 0)])
+                R += einsum_func('aci, ciz -> az', h_args[(0, 1)], z_args[(2, 0)])
 
         if truncation.h_at_least_quadratic:
             if truncation.z_at_least_cubic:
-                R += (1 / 2) * np.einsum('acij, cijz -> az', h_args[(0, 2)], z_args[(3, 0)])
+                R += (1 / 2) * einsum_func('acij, cijz -> az', h_args[(0, 2)], z_args[(3, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
     return
 
 
-def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='b', rank=1, m=0, n=1) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -152,49 +159,49 @@ def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
     if ansatz.ground_state:
         if truncation.t_singles:
             if truncation.z_at_least_quadratic:
-                R += np.einsum('i, ac, ciz -> az', t_args[(0, 1)], h_args[(0, 0)], z_args[(2, 0)])
+                R += einsum_func('i, ac, ciz -> az', t_args[(0, 1)], h_args[(0, 0)], z_args[(2, 0)])
             if truncation.z_at_least_cubic:
-                R += (1 / 2) * np.einsum('i, j, ac, cijz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 0)], z_args[(3, 0)])
+                R += (1 / 2) * einsum_func('i, j, ac, cijz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(0, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_linear:
             if truncation.t_singles:
                 if truncation.z_at_least_linear:
                     R += (
-                        np.einsum('i, acz, ci -> az', t_args[(0, 1)], h_args[(1, 0)], z_args[(1, 0)]) +
-                        np.einsum('i, aci, cz -> az', t_args[(0, 1)], h_args[(1, 0)], z_args[(1, 0)])
+                        einsum_func('i, acz, ci -> az', t_args[(0, 1)], h_args[(1, 0)], z_args[(1, 0)]) +
+                        einsum_func('i, aci, cz -> az', t_args[(0, 1)], h_args[(1, 0)], z_args[(1, 0)])
                     )
                 if truncation.z_at_least_quadratic:
                     R += (
-                        np.einsum('i, acij, cjz -> az', t_args[(0, 1)], h_args[(1, 1)], z_args[(2, 0)]) +
-                        np.einsum('i, acjz, cij -> az', t_args[(0, 1)], h_args[(1, 1)], z_args[(2, 0)]) +
-                        np.einsum('i, j, acj, ciz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
+                        einsum_func('i, acij, cjz -> az', t_args[(0, 1)], h_args[(1, 1)], z_args[(2, 0)]) +
+                        einsum_func('i, acjz, cij -> az', t_args[(0, 1)], h_args[(1, 1)], z_args[(2, 0)]) +
+                        einsum_func('i, j, acj, ciz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
                     )
-                    R += (1 / 2) * np.einsum('i, j, acz, cij -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
+                    R += (1 / 2) * einsum_func('i, j, acz, cij -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
                 if truncation.z_at_least_cubic:
                     R += (
-                        np.einsum('i, acj, cijz -> az', t_args[(0, 1)], h_args[(0, 1)], z_args[(3, 0)]) +
-                        np.einsum('i, j, acjk, cikz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)])
+                        einsum_func('i, acj, cijz -> az', t_args[(0, 1)], h_args[(0, 1)], z_args[(3, 0)]) +
+                        einsum_func('i, j, acjk, cikz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)])
                     )
                     R += (1 / 2) * (
-                        np.einsum('i, j, ackz, cijk -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)]) +
-                        np.einsum('i, j, k, ack, cijz -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                        einsum_func('i, j, ackz, cijk -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)]) +
+                        einsum_func('i, j, k, ack, cijz -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
                     )
-                    R += (1 / 6) * np.einsum('i, j, k, acz, cijk -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                    R += (1 / 6) * einsum_func('i, j, k, acz, cijk -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_quadratic:
             if truncation.t_singles:
-                R += np.einsum('i, aciz, c -> az', t_args[(0, 1)], h_args[(2, 0)], z_args[(0, 0)])
+                R += einsum_func('i, aciz, c -> az', t_args[(0, 1)], h_args[(2, 0)], z_args[(0, 0)])
                 if truncation.z_at_least_linear:
-                    R += np.einsum('i, j, acjz, ci -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
-                    R += (1 / 2) * np.einsum('i, j, acij, cz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
+                    R += einsum_func('i, j, acjz, ci -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
+                    R += (1 / 2) * einsum_func('i, j, acij, cz -> az', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
                 if truncation.z_at_least_quadratic:
                     R += (1 / 2) * (
-                        np.einsum('i, j, k, acjk, ciz -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
-                        np.einsum('i, j, k, ackz, cij -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
+                        einsum_func('i, j, k, acjk, ciz -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
+                        einsum_func('i, j, k, ackz, cij -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
                     )
                 if truncation.z_at_least_cubic:
-                    R += (1 / 4) * np.einsum('i, j, k, l, ackl, cijz -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 6) * np.einsum('i, j, k, l, aclz, cijk -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 4) * einsum_func('i, j, k, l, ackl, cijz -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 6) * einsum_func('i, j, k, l, aclz, cijk -> az', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
@@ -206,7 +213,7 @@ def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
 
 # -------------- operator(name='bb', rank=2, m=0, n=2) TERMS -------------- #
-def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='bb', rank=2, m=0, n=2) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -214,25 +221,25 @@ def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
     if ansatz.ground_state:
         if truncation.z_at_least_quadratic:
-            R += (1 / 2) * np.einsum('ac, czy -> azy', h_args[(0, 0)], z_args[(2, 0)])
+            R += (1 / 2) * einsum_func('ac, czy -> azy', h_args[(0, 0)], z_args[(2, 0)])
 
         if truncation.h_at_least_linear:
             if truncation.z_at_least_linear:
-                R += np.einsum('acz, cy -> azy', h_args[(1, 0)], z_args[(1, 0)])
+                R += einsum_func('acz, cy -> azy', h_args[(1, 0)], z_args[(1, 0)])
             if truncation.z_at_least_quadratic:
-                R += np.einsum('aciz, ciy -> azy', h_args[(1, 1)], z_args[(2, 0)])
+                R += einsum_func('aciz, ciy -> azy', h_args[(1, 1)], z_args[(2, 0)])
             if truncation.z_at_least_cubic:
-                R += (1 / 2) * np.einsum('aci, cizy -> azy', h_args[(0, 1)], z_args[(3, 0)])
+                R += (1 / 2) * einsum_func('aci, cizy -> azy', h_args[(0, 1)], z_args[(3, 0)])
 
         if truncation.h_at_least_quadratic:
-            R += (1 / 2) * np.einsum('aczy, c -> azy', h_args[(2, 0)], z_args[(0, 0)])
+            R += (1 / 2) * einsum_func('aczy, c -> azy', h_args[(2, 0)], z_args[(0, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
     return
 
 
-def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='bb', rank=2, m=0, n=2) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -241,36 +248,36 @@ def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
     if ansatz.ground_state:
         if truncation.t_singles:
             if truncation.z_at_least_cubic:
-                R += (1 / 2) * np.einsum('i, ac, cizy -> azy', t_args[(0, 1)], h_args[(0, 0)], z_args[(3, 0)])
+                R += (1 / 2) * einsum_func('i, ac, cizy -> azy', t_args[(0, 1)], h_args[(0, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_linear:
             if truncation.t_singles:
                 if truncation.z_at_least_quadratic:
-                    R += np.einsum('i, acz, ciy -> azy', t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
-                    R += (1 / 2) * np.einsum('i, aci, czy -> azy', t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
+                    R += einsum_func('i, acz, ciy -> azy', t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
+                    R += (1 / 2) * einsum_func('i, aci, czy -> azy', t_args[(0, 1)], h_args[(1, 0)], z_args[(2, 0)])
                 if truncation.z_at_least_cubic:
-                    R += np.einsum('i, acjz, cijy -> azy', t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)])
+                    R += einsum_func('i, acjz, cijy -> azy', t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)])
                     R += (1 / 2) * (
-                        np.einsum('i, acij, cjzy -> azy', t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)]) +
-                        np.einsum('i, j, acj, cizy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)]) +
-                        np.einsum('i, j, acz, cijy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                        einsum_func('i, acij, cjzy -> azy', t_args[(0, 1)], h_args[(1, 1)], z_args[(3, 0)]) +
+                        einsum_func('i, j, acj, cizy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)]) +
+                        einsum_func('i, j, acz, cijy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
                     )
 
         if truncation.h_at_least_quadratic:
             if truncation.t_singles:
                 if truncation.z_at_least_linear:
-                    R += np.einsum('i, aciz, cy -> azy', t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
-                    R += (1 / 2) * np.einsum('i, aczy, ci -> azy', t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
+                    R += einsum_func('i, aciz, cy -> azy', t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
+                    R += (1 / 2) * einsum_func('i, aczy, ci -> azy', t_args[(0, 1)], h_args[(2, 0)], z_args[(1, 0)])
                 if truncation.z_at_least_quadratic:
-                    R += np.einsum('i, j, acjz, ciy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
+                    R += einsum_func('i, j, acjz, ciy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
                     R += (1 / 4) * (
-                        np.einsum('i, j, aczy, cij -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
-                        np.einsum('i, j, acij, czy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
+                        einsum_func('i, j, aczy, cij -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
+                        einsum_func('i, j, acij, czy -> azy', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
                     )
                 if truncation.z_at_least_cubic:
-                    R += (1 / 12) * np.einsum('i, j, k, aczy, cijk -> azy', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 2) * np.einsum('i, j, k, ackz, cijy -> azy', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 4) * np.einsum('i, j, k, acjk, cizy -> azy', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 12) * einsum_func('i, j, k, aczy, cijk -> azy', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 2) * einsum_func('i, j, k, ackz, cijy -> azy', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 4) * einsum_func('i, j, k, acjk, cizy -> azy', t_args[(0, 1)], t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
@@ -282,7 +289,7 @@ def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
 
 # -------------- operator(name='bbb', rank=3, m=0, n=3) TERMS -------------- #
-def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='bbb', rank=3, m=0, n=3) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -290,48 +297,24 @@ def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
     if ansatz.ground_state:
         if truncation.z_at_least_cubic:
-            R += (1 / 6) * np.einsum('ac, czyx -> azyx', h_args[(0, 0)], z_args[(3, 0)])
+            R += (1 / 6) * einsum_func('ac, czyx -> azyx', h_args[(0, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_linear:
             if truncation.z_at_least_quadratic:
-                R += (1 / 2) * np.einsum('acz, cyx -> azyx', h_args[(1, 0)], z_args[(2, 0)])
+                R += (1 / 2) * einsum_func('acz, cyx -> azyx', h_args[(1, 0)], z_args[(2, 0)])
             if truncation.z_at_least_cubic:
-                R += (1 / 2) * np.einsum('aciz, ciyx -> azyx', h_args[(1, 1)], z_args[(3, 0)])
+                R += (1 / 2) * einsum_func('aciz, ciyx -> azyx', h_args[(1, 1)], z_args[(3, 0)])
 
         if truncation.h_at_least_quadratic:
             if truncation.z_at_least_linear:
-                R += (1 / 2) * np.einsum('aczy, cx -> azyx', h_args[(2, 0)], z_args[(1, 0)])
-    else:
-        raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
-
-    return
-
-def add_m0_n3_HZ_terms_GPU(R, ansatz, truncation, t_args, h_args, z_args):
-    """ Calculate the operator(name='bbb', rank=3, m=0, n=3) HZ terms.
-    These terms have no vibrational contribution from the e^T operator.
-    This reduces the number of possible non-zero permutations of creation/annihilation operators.
-    """
-
-    if ansatz.ground_state:
-        if truncation.z_at_least_cubic:
-            R += (1 / 6) * torch.einsum('ac, czyx -> azyx', h_args[(0, 0)], z_args[(3, 0)])
-
-        if truncation.h_at_least_linear:
-            if truncation.z_at_least_quadratic:
-                R += (1 / 2) * torch.einsum('acz, cyx -> azyx', h_args[(1, 0)], z_args[(2, 0)])
-            if truncation.z_at_least_cubic:
-                R += (1 / 2) * torch.einsum('aciz, ciyx -> azyx', h_args[(1, 1)], z_args[(3, 0)])
-
-        if truncation.h_at_least_quadratic:
-            if truncation.z_at_least_linear:
-                R += (1 / 2) * torch.einsum('aczy, cx -> azyx', h_args[(2, 0)], z_args[(1, 0)])
+                R += (1 / 2) * einsum_func('aczy, cx -> azyx', h_args[(2, 0)], z_args[(1, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
     return
 
 
-def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
+def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='bbb', rank=3, m=0, n=3) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -341,50 +324,20 @@ def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
         if truncation.h_at_least_linear:
             if truncation.t_singles:
                 if truncation.z_at_least_cubic:
-                    R += (1 / 2) * np.einsum('i, acz, ciyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
-                    R += (1 / 6) * np.einsum('i, aci, czyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                    R += (1 / 2) * einsum_func('i, acz, ciyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                    R += (1 / 6) * einsum_func('i, aci, czyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
 
         if truncation.h_at_least_quadratic:
             if truncation.t_singles:
                 if truncation.z_at_least_quadratic:
                     R += (1 / 2) * (
-                        np.einsum('i, aczy, cix -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
-                        np.einsum('i, aciz, cyx -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
+                        einsum_func('i, aczy, cix -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
+                        einsum_func('i, aciz, cyx -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
                     )
                 if truncation.z_at_least_cubic:
-                    R += (1 / 12) * np.einsum('i, j, acij, czyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 2) * np.einsum('i, j, acjz, ciyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 4) * np.einsum('i, j, aczy, cijx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-    else:
-        raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
-
-    return
-
-
-def add_m0_n3_eT_HZ_terms_GPU(R, ansatz, truncation, t_args, h_args, z_args):
-    """ Calculate the operator(name='bbb', rank=3, m=0, n=3) eT_HZ terms.
-    These terms include the vibrational contributions from the e^T operator.
-    This increases the number of possible non-zero permutations of creation/annihilation operators.
-    """
-
-    if ansatz.ground_state:
-        if truncation.h_at_least_linear:
-            if truncation.t_singles:
-                if truncation.z_at_least_cubic:
-                    R += (1 / 2) * torch.einsum('i, acz, ciyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
-                    R += (1 / 6) * torch.einsum('i, aci, czyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
-
-        if truncation.h_at_least_quadratic:
-            if truncation.t_singles:
-                if truncation.z_at_least_quadratic:
-                    R += (1 / 2) * (
-                        torch.einsum('i, aczy, cix -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
-                        torch.einsum('i, aciz, cyx -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
-                    )
-                if truncation.z_at_least_cubic:
-                    R += (1 / 12) * torch.einsum('i, j, acij, czyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 2) * torch.einsum('i, j, acjz, ciyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
-                    R += (1 / 4) * torch.einsum('i, j, aczy, cijx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 12) * einsum_func('i, j, acij, czyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 2) * einsum_func('i, j, acjz, ciyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 4) * einsum_func('i, j, aczy, cijx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
@@ -400,8 +353,19 @@ def compute_m0_n0_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     R = np.zeros(shape=(A,), dtype=complex)
 
     # add the terms
-    add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
-    add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+    if global_GPU_flag:
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n0_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
     return R
 
 
@@ -413,8 +377,19 @@ def compute_m0_n1_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     R = np.zeros(shape=(A, N), dtype=complex)
 
     # add the terms
-    add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
-    add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+    if global_GPU_flag:
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n1_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
     return R
 
 
@@ -427,8 +402,19 @@ def compute_m0_n2_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     R = np.zeros(shape=(A, N, N), dtype=complex)
 
     # add the terms
-    add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
-    add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+    if global_GPU_flag:
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n2_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
     return R
 
 
@@ -441,28 +427,20 @@ def compute_m0_n3_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     # the residual tensor (create this on the GPU
     R = np.zeros(shape=(A, N, N, N), dtype=complex)
 
-    if GPU_flag := True: 
-        R_gpu = move_to_GPU(R)
-    
+    # add the terms
+    if global_GPU_flag:
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-        gpu_t_args, gpu_h_args, gpu_z_args = {}, {}, {}
-        for k, v in t_args.items():
-            gpu_t_args[k] = move_to_GPU(v)
-        for k, v in h_args.items():
-            gpu_h_args[k] = move_to_GPU(v)
-        for k, v in z_args.items():
-            gpu_z_args[k] = move_to_GPU(v)
-        
-        add_m0_n3_HZ_terms_GPU(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args)
-        add_m0_n3_eT_HZ_terms_GPU(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args)
-        
-        # make sure to transfer R back to the cpu
-        R = move_to_CPU(R_gpu)
-        
-    else: # previous style
-        add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
-        add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
 
+        add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n3_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
     return R
 
 # ------------------------------------------------------------------------------------------------------------- #
@@ -793,8 +771,27 @@ def compute_m0_n0_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
 
     # add the terms
-    add_m0_n0_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
-    add_m0_n0_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
+    if global_GPU_flag:
+
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        """ Based on the docs from https://optimized-einsum.readthedocs.io/en/stable/backends.html
+        we should be able to hook into torch backend using opt_einsum?
+        supposedly "The automatic backend detection will be detected based on the first supplied array"
+        since the t/h/z args will be all on the gpu, then pytorch should be detected automatically?
+        """
+        print("Hoping pytorch will automatically be identified by opt_einsum library")
+
+        add_m0_n0_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
+        add_m0_n0_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n0_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
+        add_m0_n0_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
     return R
 
 
@@ -809,8 +806,20 @@ def compute_m0_n1_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
 
     # add the terms
-    add_m0_n1_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
-    add_m0_n1_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
+    if global_GPU_flag:
+
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        add_m0_n1_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
+        add_m0_n1_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n1_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
+        add_m0_n1_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
     return R
 
 
@@ -826,8 +835,20 @@ def compute_m0_n2_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
 
     # add the terms
-    add_m0_n2_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
-    add_m0_n2_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
+    if global_GPU_flag:
+
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        add_m0_n2_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
+        add_m0_n2_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
+        R = move_to_CPU(R_gpu)
+    else:
+        add_m0_n2_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
+        add_m0_n2_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
     return R
 
 
@@ -844,35 +865,21 @@ def compute_m0_n3_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
 
     # add the terms
-    if GPU_flag := True: 
-        R_gpu = move_to_GPU(R)
-    
-        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-        gpu_t_args, gpu_h_args, gpu_z_args = {}, {}, {}
-        for k, v in t_args.items():
-            gpu_t_args[k] = move_to_GPU(v)
-        for k, v in h_args.items():
-            gpu_h_args[k] = move_to_GPU(v)
-        for k, v in z_args.items():
-            gpu_z_args[k] = move_to_GPU(v)
+    if global_GPU_flag:
 
-        """ Based on the docs from https://optimized-einsum.readthedocs.io/en/stable/backends.html
-        we should be able to hook into torch backend using opt_einsum?
-        supposedly "The automatic backend detection will be detected based on the first supplied array"
-        since the t/h/z args will be all on the gpu, then pytorch should be detected automatically?
-        """
-        print("Hoping pytorch will automatically be identified by opt_einsum library")
-        
-        add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
-        add_m0_n3_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
-        
-        # make sure to transfer R back to the cpu
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        R_gpu = move_to_GPU(R)
+        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+        add_m0_n3_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
+        add_m0_n3_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
         R = move_to_CPU(R_gpu)
-    
     else:
         add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
         add_m0_n3_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
-    
+
     return R
 
 # ------------------------------------------------------------------------------------------------------------- #
