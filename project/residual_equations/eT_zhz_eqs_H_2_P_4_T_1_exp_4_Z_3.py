@@ -5,9 +5,31 @@ from math import factorial
 import numpy as np
 import opt_einsum as oe
 
+
 # local imports
 from .symmetrize import symmetrize_tensor
 from ..log_conf import log
+
+# ------------------------------------------------------------------------------------------------------------- #
+# for testing purposes
+import torch 
+device = torch.device('cuda')
+assert torch.cuda.is_available, f"CUDE not available"
+torch.backends.cuda.matmul.allow_tf32 = True # Enable/disable TF32 for matrix multiplications
+
+torch.set_default_dtype(torch.float32)
+if True:
+    torch.set_default_dtype(torch.float64)
+
+# ------------------------------------------------------------------------------------------------------------- #
+
+def move_to_GPU(x):
+    """ temp func for easy cProfile tracking """
+    return x.to()
+
+def move_to_CPU(x):
+    """ temp func for easy cProfile tracking """
+    return x.cpu()
 
 # ------------------------------------------------------------------------------------------------------------- #
 # --------------------------------------------- DEFAULT FUNCTIONS --------------------------------------------- #
@@ -284,6 +306,30 @@ def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
 
     return
 
+def add_m0_n3_HZ_terms_GPU(R, ansatz, truncation, t_args, h_args, z_args):
+    """ Calculate the operator(name='bbb', rank=3, m=0, n=3) HZ terms.
+    These terms have no vibrational contribution from the e^T operator.
+    This reduces the number of possible non-zero permutations of creation/annihilation operators.
+    """
+
+    if ansatz.ground_state:
+        if truncation.z_at_least_cubic:
+            R += (1 / 6) * torch.einsum('ac, czyx -> azyx', h_args[(0, 0)], z_args[(3, 0)])
+
+        if truncation.h_at_least_linear:
+            if truncation.z_at_least_quadratic:
+                R += (1 / 2) * torch.einsum('acz, cyx -> azyx', h_args[(1, 0)], z_args[(2, 0)])
+            if truncation.z_at_least_cubic:
+                R += (1 / 2) * torch.einsum('aciz, ciyx -> azyx', h_args[(1, 1)], z_args[(3, 0)])
+
+        if truncation.h_at_least_quadratic:
+            if truncation.z_at_least_linear:
+                R += (1 / 2) * torch.einsum('aczy, cx -> azyx', h_args[(2, 0)], z_args[(1, 0)])
+    else:
+        raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
+
+    return
+
 
 def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
     """ Calculate the operator(name='bbb', rank=3, m=0, n=3) eT_HZ terms.
@@ -309,6 +355,36 @@ def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args):
                     R += (1 / 12) * np.einsum('i, j, acij, czyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
                     R += (1 / 2) * np.einsum('i, j, acjz, ciyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
                     R += (1 / 4) * np.einsum('i, j, aczy, cijx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+    else:
+        raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
+
+    return
+
+
+def add_m0_n3_eT_HZ_terms_GPU(R, ansatz, truncation, t_args, h_args, z_args):
+    """ Calculate the operator(name='bbb', rank=3, m=0, n=3) eT_HZ terms.
+    These terms include the vibrational contributions from the e^T operator.
+    This increases the number of possible non-zero permutations of creation/annihilation operators.
+    """
+
+    if ansatz.ground_state:
+        if truncation.h_at_least_linear:
+            if truncation.t_singles:
+                if truncation.z_at_least_cubic:
+                    R += (1 / 2) * torch.einsum('i, acz, ciyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+                    R += (1 / 6) * torch.einsum('i, aci, czyx -> azyx', t_args[(0, 1)], h_args[(1, 0)], z_args[(3, 0)])
+
+        if truncation.h_at_least_quadratic:
+            if truncation.t_singles:
+                if truncation.z_at_least_quadratic:
+                    R += (1 / 2) * (
+                        torch.einsum('i, aczy, cix -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)]) +
+                        torch.einsum('i, aciz, cyx -> azyx', t_args[(0, 1)], h_args[(2, 0)], z_args[(2, 0)])
+                    )
+                if truncation.z_at_least_cubic:
+                    R += (1 / 12) * torch.einsum('i, j, acij, czyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 2) * torch.einsum('i, j, acjz, ciyx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
+                    R += (1 / 4) * torch.einsum('i, j, aczy, cijx -> azyx', t_args[(0, 1)], t_args[(0, 1)], h_args[(2, 0)], z_args[(3, 0)])
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
@@ -362,12 +438,31 @@ def compute_m0_n3_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     truncation.confirm_at_least_doubles()
     truncation.confirm_at_least_triples()
 
-    # the residual tensor
+    # the residual tensor (create this on the GPU
     R = np.zeros(shape=(A, N, N, N), dtype=complex)
 
-    # add the terms
-    add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
-    add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+    if GPU_flag := True: 
+        R_gpu = move_to_GPU(R)
+    
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        gpu_t_args, gpu_h_args, gpu_z_args = {}, {}, {}
+        for k, v in t_args.items():
+            gpu_t_args[k] = move_to_GPU(v)
+        for k, v in h_args.items():
+            gpu_h_args[k] = move_to_GPU(v)
+        for k, v in z_args.items():
+            gpu_z_args[k] = move_to_GPU(v)
+        
+        add_m0_n3_HZ_terms_GPU(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args)
+        add_m0_n3_eT_HZ_terms_GPU(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args)
+        
+        # make sure to transfer R back to the cpu
+        R = move_to_CPU(R_gpu)
+        
+    else: # previous style
+        add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+        add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args)
+
     return R
 
 # ------------------------------------------------------------------------------------------------------------- #
@@ -749,8 +844,35 @@ def compute_m0_n3_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
 
     # add the terms
-    add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
-    add_m0_n3_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
+    if GPU_flag := True: 
+        R_gpu = move_to_GPU(R)
+    
+        # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+        gpu_t_args, gpu_h_args, gpu_z_args = {}, {}, {}
+        for k, v in t_args.items():
+            gpu_t_args[k] = move_to_GPU(v)
+        for k, v in h_args.items():
+            gpu_h_args[k] = move_to_GPU(v)
+        for k, v in z_args.items():
+            gpu_z_args[k] = move_to_GPU(v)
+
+        """ Based on the docs from https://optimized-einsum.readthedocs.io/en/stable/backends.html
+        we should be able to hook into torch backend using opt_einsum?
+        supposedly "The automatic backend detection will be detected based on the first supplied array"
+        since the t/h/z args will be all on the gpu, then pytorch should be detected automatically?
+        """
+        print("Hoping pytorch will automatically be identified by opt_einsum library")
+        
+        add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
+        add_m0_n3_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
+        
+        # make sure to transfer R back to the cpu
+        R = move_to_CPU(R_gpu)
+    
+    else:
+        add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
+        add_m0_n3_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
+    
     return R
 
 # ------------------------------------------------------------------------------------------------------------- #
