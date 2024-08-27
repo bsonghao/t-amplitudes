@@ -38,6 +38,11 @@ def move_to_CPU(x):
     """ temp func for easy cProfile tracking """
     return x.cpu()
 
+
+def get_numpy_R_back_from_GPU(x):
+    """ temp func for exploring use of numpy/torch tensors """
+    return x.move_to_CPU(x).detach().numpy()
+
 # ------------------------------------------------------------------------------------------------------------- #
 # --------------------------------------------- DEFAULT FUNCTIONS --------------------------------------------- #
 # ------------------------------------------------------------------------------------------------------------- #
@@ -350,7 +355,10 @@ def compute_m0_n0_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     truncation.confirm_at_least_singles()
 
     # the residual tensor
-    R = np.zeros(shape=(A,), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A,), dtype=complex)
+    else:
+        R = np.zeros(shape=(A,), dtype=complex)
 
     # add the terms
     if global_GPU_flag:
@@ -362,7 +370,7 @@ def compute_m0_n0_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
 
         add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n0_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
         add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
@@ -374,7 +382,10 @@ def compute_m0_n1_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     truncation.confirm_at_least_singles()
 
     # the residual tensor
-    R = np.zeros(shape=(A, N), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A, N), dtype=complex)
+    else:
+        R = np.zeros(shape=(A, N), dtype=complex)
 
     # add the terms
     if global_GPU_flag:
@@ -386,7 +397,7 @@ def compute_m0_n1_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
 
         add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n1_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
         add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
@@ -399,7 +410,10 @@ def compute_m0_n2_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     truncation.confirm_at_least_doubles()
 
     # the residual tensor
-    R = np.zeros(shape=(A, N, N), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A, N, N), dtype=complex)
+    else:
+        R = np.zeros(shape=(A, N, N), dtype=complex)
 
     # add the terms
     if global_GPU_flag:
@@ -411,7 +425,7 @@ def compute_m0_n2_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
 
         add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n2_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
         add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
@@ -424,8 +438,11 @@ def compute_m0_n3_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     truncation.confirm_at_least_doubles()
     truncation.confirm_at_least_triples()
 
-    # the residual tensor (create this on the GPU
-    R = np.zeros(shape=(A, N, N, N), dtype=complex)
+    # the residual tensor
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A, N, N, N), dtype=complex)
+    else:
+        R = np.zeros(shape=(A, N, N, N), dtype=complex)
 
     # add the terms
     if global_GPU_flag:
@@ -437,7 +454,7 @@ def compute_m0_n3_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
 
         add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n3_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
         add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
@@ -765,7 +782,10 @@ def compute_m0_n0_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     truncation.confirm_at_least_singles()
 
     # the residual tensor
-    R = np.zeros(shape=(A,), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A,), dtype=complex)
+    else:
+        R = np.zeros(shape=(A,), dtype=complex)
 
     # unpack the optimized paths
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
@@ -788,7 +808,7 @@ def compute_m0_n0_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         add_m0_n0_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n0_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n0_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
         add_m0_n0_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
@@ -800,7 +820,10 @@ def compute_m0_n1_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     truncation.confirm_at_least_singles()
 
     # the residual tensor
-    R = np.zeros(shape=(A, N), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A, N), dtype=complex)
+    else:
+        R = np.zeros(shape=(A, N), dtype=complex)
 
     # unpack the optimized paths
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
@@ -816,7 +839,8 @@ def compute_m0_n1_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         add_m0_n1_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n1_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
+
     else:
         add_m0_n1_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
         add_m0_n1_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
@@ -829,7 +853,10 @@ def compute_m0_n2_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     truncation.confirm_at_least_doubles()
 
     # the residual tensor
-    R = np.zeros(shape=(A, N, N), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A, N, N), dtype=complex)
+    else:
+        R = np.zeros(shape=(A, N, N), dtype=complex)
 
     # unpack the optimized paths
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
@@ -845,7 +872,7 @@ def compute_m0_n2_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         add_m0_n2_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n2_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n2_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
         add_m0_n2_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
@@ -859,7 +886,10 @@ def compute_m0_n3_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
     truncation.confirm_at_least_triples()
 
     # the residual tensor
-    R = np.zeros(shape=(A, N, N, N), dtype=complex)
+    if global_GPU_flag:
+        R = torch.zeros(shape=(A, N, N, N), dtype=complex)
+    else:
+        R = np.zeros(shape=(A, N, N, N), dtype=complex)
 
     # unpack the optimized paths
     optimized_HZ_paths, optimized_eT_HZ_paths = opt_paths
@@ -875,7 +905,7 @@ def compute_m0_n3_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         add_m0_n3_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n3_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
-        R = move_to_CPU(R_gpu)
+        R = get_numpy_R_back_from_GPU(R_gpu)
     else:
         add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_HZ_paths)
         add_m0_n3_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, optimized_eT_HZ_paths)
@@ -1278,5 +1308,4 @@ def compute_all_optimized_paths(A, N, ansatz, truncation):
     all_opt_path_lists[(0, 3)] = compute_m0_n3_optimized_paths(A, N, ansatz, truncation)[(0, 3)]
 
     return all_opt_path_lists
-
 
