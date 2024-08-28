@@ -34,6 +34,11 @@ def move_to_GPU(x):
     return x.to()
 
 
+def move_to_GPU_from_numpy(x):
+    """ temp func for easy cProfile tracking """
+    return move_to_GPU(torch.from_numpy(x))
+
+
 def move_to_CPU(x):
     """ temp func for easy cProfile tracking """
     return x.cpu()
@@ -79,10 +84,10 @@ def gpu_add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -177,10 +182,10 @@ def gpu_add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -282,10 +287,10 @@ def gpu_add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -373,10 +378,10 @@ def gpu_add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -428,9 +433,9 @@ def compute_m0_n0_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     if global_GPU_flag:
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n0_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
@@ -455,9 +460,9 @@ def compute_m0_n1_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     if global_GPU_flag:
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n1_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
@@ -483,9 +488,9 @@ def compute_m0_n2_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     if global_GPU_flag:
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n2_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
@@ -512,9 +517,9 @@ def compute_m0_n3_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
     if global_GPU_flag:
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
         add_m0_n3_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
@@ -563,10 +568,10 @@ def gpu_add_m0_n0_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_ar
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n0_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -667,10 +672,10 @@ def gpu_add_m0_n1_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_ar
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n1_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -771,10 +776,10 @@ def gpu_add_m0_n2_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_ar
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n2_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -864,10 +869,10 @@ def gpu_add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_ar
     """
 
     # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
-    R_gpu = move_to_GPU(torch.from_numpy(R))
-    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+    R_gpu = move_to_GPU_from_numpy(R)
+    gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
     add_m0_n3_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
     R = get_numpy_R_back_from_GPU(R_gpu)
@@ -923,9 +928,9 @@ def compute_m0_n0_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         """ Based on the docs from https://optimized-einsum.readthedocs.io/en/stable/backends.html
         we should be able to hook into torch backend using opt_einsum?
@@ -961,9 +966,9 @@ def compute_m0_n1_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n1_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n1_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
@@ -994,9 +999,9 @@ def compute_m0_n2_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n2_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n2_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
@@ -1027,9 +1032,9 @@ def compute_m0_n3_amplitude_optimized(A, N, ansatz, truncation, t_args, h_args, 
 
         # need to move each of these over to gpu (probably should replace with a generator fxn approach after testing)
         R_gpu = move_to_GPU(R)
-        gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
-        gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
-        gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+        gpu_t_args = {k: move_to_GPU_from_numpy(v) for k, v in t_args.items()}
+        gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
+        gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
         add_m0_n3_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_HZ_paths)
         add_m0_n3_eT_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, optimized_eT_HZ_paths)
