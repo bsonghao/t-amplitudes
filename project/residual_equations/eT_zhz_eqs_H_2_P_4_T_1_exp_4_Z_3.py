@@ -73,6 +73,22 @@ def add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     return
 
 
+def gpu_add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    R = get_numpy_R_back_from_GPU(R_gpu)
+    return
+
+
 def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='', rank=0, m=0, n=0) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
@@ -152,6 +168,22 @@ def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
+    return
+
+
+def gpu_add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
@@ -244,6 +276,22 @@ def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     return
 
 
+def gpu_add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    R = get_numpy_R_back_from_GPU(R_gpu)
+    return
+
+
 def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
     """ Calculate the operator(name='bb', rank=2, m=0, n=2) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
@@ -316,6 +364,22 @@ def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
+    return
+
+
+def gpu_add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
@@ -493,6 +557,22 @@ def add_m0_n0_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, 
     return
 
 
+def gpu_add_m0_n0_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, opt_HZ_path_list):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n0_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
+    R = get_numpy_R_back_from_GPU(R_gpu)
+    return
+
+
 def add_m0_n0_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, opt_eT_HZ_path_list):
     """ Optimized calculation of the operator(name='', rank=0, m=0, n=0) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
@@ -578,6 +658,22 @@ def add_m0_n1_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, 
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
+    return
+
+
+def gpu_add_m0_n1_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, opt_HZ_path_list):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n1_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
+    R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
@@ -669,6 +765,22 @@ def add_m0_n2_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, 
     return
 
 
+def gpu_add_m0_n2_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, opt_HZ_path_list):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n2_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
+    R = get_numpy_R_back_from_GPU(R_gpu)
+    return
+
+
 def add_m0_n2_eT_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, opt_eT_HZ_path_list):
     """ Optimized calculation of the operator(name='bb', rank=2, m=0, n=2) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
@@ -743,6 +855,22 @@ def add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, 
     else:
         raise Exception('Hot Band amplitudes not implemented properly and have not been theoretically verified!')
 
+    return
+
+
+def gpu_add_m0_n3_HZ_terms_optimized(R, ansatz, truncation, t_args, h_args, z_args, opt_HZ_path_list):
+    """ temp fxn for testing gpu
+    just wraps the add fxn and moves data from RAM to GPU and back
+    """
+
+    # move each of these over to gpu (probably should replace with a generator fxn approach after testing)
+    R_gpu = move_to_GPU(torch.from_numpy(R))
+    gpu_t_args = {k: move_to_GPU(v) for k, v in t_args.items()}
+    gpu_h_args = {k: move_to_GPU(v) for k, v in h_args.items()}
+    gpu_z_args = {k: move_to_GPU(v) for k, v in z_args.items()}
+
+    add_m0_n3_HZ_terms_optimized(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, opt_HZ_path_list)
+    R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
