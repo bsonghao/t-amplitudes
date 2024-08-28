@@ -2084,36 +2084,50 @@ class vibronic_hamiltonian(object):
                 if self.Z_truncation_order not in [1, 2, 3]:
                     raise Exception(generated_equation_exception_string)
 
+            """
+            this whole section needs to be rewritten after we fully test the gpu code.
+            I should likely do a pass with args and kwargs style argument passing
+            as well as defining some new wrapper functions in `z_three_eqns` style code
+            probably write some fxns like
+            compute_residual_0()
+            compute_residual_1()
+            compute_residual_2()
+            compute_residual_3()
+            """
+
             # constant
             if not generated_flag:
                 residual[0] = self._f_z_0(H_bar_tilde, C, T_conj_dict, opt_flag)
             else:
                 if new_scheme_flag:
                     residual[0] = np.zeros(shape=(A, ), dtype=complex)
+                    args = (
+                        residual[0], self.ansatz, self.gen_trunc,
+                        _special_T_conj, H_bar_tilde, C
+                    )
+                    if not opt_flag:
+                        if z_three_eqns.global_GPU_flag:  # replace later
+                            z_three_eqns.gpu_add_m0_n0_HZ_terms(*args)
+                        else:
+                            z_three_eqns.add_m0_n0_HZ_terms(*args)
+                    else:
+                        args += (self.all_opt_paths[(0, 0)][0],)
+                        if z_three_eqns.global_GPU_flag:  # replace later
+                            z_three_eqns.gpu_add_m0_n0_HZ_terms_optimized(*args)
+                        else:
+                            z_three_eqns.add_m0_n0_HZ_terms_optimized(*args)
 
-                    if not opt_flag:
-                        z_three_eqns.add_m0_n0_HZ_terms(
-                            residual[0], self.ansatz, self.gen_trunc,
-                            _special_T_conj, H_bar_tilde, C
-                        )
-                    else:
-                        z_three_eqns.add_m0_n0_HZ_terms_optimized(
-                            residual[0], self.ansatz, self.gen_trunc,
-                            _special_T_conj, H_bar_tilde, C,
-                            self.all_opt_paths[(0, 0)][0]
-                        )
                 else:
+                    args = (
+                        A, N, self.ansatz, self.gen_trunc,
+                        _special_T_conj, H_bar, gen_Z
+                    )
+                    # `z_three_eqns` handles the gpu switch inside the `compute` fxns
                     if not opt_flag:
-                        residual[0] = z_three_eqns.compute_m0_n0_amplitude(
-                            A, N, self.ansatz, self.gen_trunc,
-                            _special_T_conj, H_bar, gen_Z
-                        )
+                        residual[0] = z_three_eqns.compute_m0_n0_amplitude(*args)
                     else:
-                        residual[0] = z_three_eqns.compute_m0_n0_amplitude_optimized(
-                            A, N, self.ansatz, self.gen_trunc,
-                            _special_T_conj, H_bar, gen_Z,
-                            self.all_opt_paths[(0, 0)]
-                        )
+                        args += (self.all_opt_paths[(0, 0)],)
+                        residual[0] = z_three_eqns.compute_m0_n0_amplitude_optimized(*args)
 
             # linear
             if self.T_truncation_order >= 1 or self.Z_truncation_order >= 1:
@@ -2122,30 +2136,32 @@ class vibronic_hamiltonian(object):
                 else:
                     if new_scheme_flag:
                         residual[1] = np.zeros(shape=(A, N), dtype=complex)
+                        args = (
+                            residual[1], self.ansatz, self.gen_trunc,
+                            _special_T_conj, H_bar_tilde, C
+                        )
 
                         if not opt_flag:
-                            z_three_eqns.add_m0_n1_HZ_terms(
-                                residual[1], self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar_tilde, C
-                            )
+                            if z_three_eqns.global_GPU_flag:  # replace later
+                                z_three_eqns.gpu_add_m0_n1_HZ_terms(*args)
+                            else:
+                                z_three_eqns.add_m0_n1_HZ_terms(*args)
                         else:
-                            z_three_eqns.add_m0_n1_HZ_terms_optimized(
-                                residual[1], self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar_tilde, C,
-                                self.all_opt_paths[(0, 1)][0]
-                            )
+                            args += (self.all_opt_paths[(0, 1)][0],)
+                            if z_three_eqns.global_GPU_flag:  # replace later
+                                z_three_eqns.gpu_add_m0_n1_HZ_terms_optimized(*args)
+                            else:
+                                z_three_eqns.add_m0_n1_HZ_terms_optimized(*args)
                     else:
+                        args = (
+                            A, N, self.ansatz, self.gen_trunc,
+                            _special_T_conj, H_bar, gen_Z
+                        )
                         if not opt_flag:
-                            residual[1] = z_three_eqns.compute_m0_n1_amplitude(
-                                A, N, self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar, gen_Z
-                            )
+                            residual[1] = z_three_eqns.compute_m0_n1_amplitude(*args)
                         else:
-                            residual[1] = z_three_eqns.compute_m0_n1_amplitude_optimized(
-                                A, N, self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar, gen_Z,
-                                self.all_opt_paths[(0, 1)]
-                            )
+                            args += (self.all_opt_paths[(0, 1)],)
+                            residual[1] = z_three_eqns.compute_m0_n1_amplitude_optimized(*args)
 
             # quadratic
             if self.T_truncation_order >= 2 or self.Z_truncation_order >= 2:
@@ -2154,30 +2170,32 @@ class vibronic_hamiltonian(object):
                 else:
                     if new_scheme_flag:
                         residual[2] = np.zeros(shape=(A, N, N), dtype=complex)
+                        args = (
+                            residual[2], self.ansatz, self.gen_trunc,
+                            _special_T_conj, H_bar_tilde, C
+                        )
 
                         if not opt_flag:
-                            z_three_eqns.add_m0_n2_HZ_terms(
-                                residual[2], self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar_tilde, C
-                            )
+                            if z_three_eqns.global_GPU_flag:  # replace later
+                                z_three_eqns.gpu_add_m0_n2_HZ_terms(*args)
+                            else:
+                                z_three_eqns.add_m0_n2_HZ_terms(*args)
                         else:
-                            z_three_eqns.add_m0_n2_HZ_terms_optimized(
-                                residual[2], self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar_tilde, C,
-                                self.all_opt_paths[(0, 2)][0]
-                            )
+                            args += (self.all_opt_paths[(0, 2)][0],)
+                            if z_three_eqns.global_GPU_flag:  # replace later
+                                z_three_eqns.gpu_add_m0_n2_HZ_terms_optimized(*args)
+                            else:
+                                z_three_eqns.add_m0_n2_HZ_terms_optimized(*args)
                     else:
+                        args = (
+                            A, N, self.ansatz, self.gen_trunc,
+                            _special_T_conj, H_bar, gen_Z
+                        )
                         if not opt_flag:
-                            residual[2] = z_three_eqns.compute_m0_n2_amplitude(
-                                A, N, self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar, gen_Z
-                            )
+                            residual[2] = z_three_eqns.compute_m0_n2_amplitude(*args)
                         else:
-                            residual[2] = z_three_eqns.compute_m0_n2_amplitude_optimized(
-                                A, N, self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar, gen_Z,
-                                self.all_opt_paths[(0, 2)]
-                            )
+                            args += (self.all_opt_paths[(0, 2)],)
+                            residual[2] = z_three_eqns.compute_m0_n2_amplitude_optimized(*args)
 
                 # symmetrize
                 # residual[2] = symmetrize_tensor(self.N, residual[2], order=2)
@@ -2190,30 +2208,32 @@ class vibronic_hamiltonian(object):
                 else:
                     if new_scheme_flag:
                         residual[3] = np.zeros(shape=(A, N, N, N), dtype=complex)
+                        args = (
+                            residual[3], self.ansatz, self.gen_trunc,
+                            _special_T_conj, H_bar_tilde, C
+                        )
 
                         if not opt_flag:
-                            z_three_eqns.add_m0_n3_HZ_terms(
-                                residual[3], self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar_tilde, C
-                            )
+                            if z_three_eqns.global_GPU_flag:  # replace later
+                                z_three_eqns.gpu_add_m0_n3_HZ_terms(*args)
+                            else:
+                                z_three_eqns.add_m0_n3_HZ_terms(*args)
                         else:
-                            z_three_eqns.add_m0_n3_HZ_terms_optimized(
-                                residual[3], self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar_tilde, C,
-                                self.all_opt_paths[(0, 3)][0]
-                            )
+                            args += (self.all_opt_paths[(0, 3)][0],)
+                            if z_three_eqns.global_GPU_flag:  # replace later
+                                z_three_eqns.gpu_add_m0_n3_HZ_terms_optimized(*args)
+                            else:
+                                z_three_eqns.add_m0_n3_HZ_terms_optimized(*args)
                     else:
+                        args = (
+                            A, N, self.ansatz, self.gen_trunc,
+                            _special_T_conj, H_bar, gen_Z
+                        )
                         if not opt_flag:
-                            residual[3] = z_three_eqns.compute_m0_n3_amplitude(
-                                A, N, self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar, gen_Z
-                            )
+                            residual[3] = z_three_eqns.compute_m0_n3_amplitude(*args)
                         else:
-                            residual[3] = z_three_eqns.compute_m0_n3_amplitude_optimized(
-                                A, N, self.ansatz, self.gen_trunc,
-                                _special_T_conj, H_bar, gen_Z,
-                                self.all_opt_paths[(0, 3)]
-                            )
+                            args += (self.all_opt_paths[(0, 3)],)
+                            residual[3] = z_three_eqns.compute_m0_n3_amplitude_optimized(*args)
 
                 # symmetrize
                 # residual[3] = symmetrize_tensor(self.N, residual[3], order=3)
