@@ -5,7 +5,7 @@ from . import model_op
 def vibronic_input_reader(name, hamiltonian_truncation_order, path):
     """a wrapper function on top of Neil's I/O script to readin vibronic model parameter from standard op file"""
     raw_model = vIO.read_raw_model_op_file(
-    f"{path}/{name}.op", get_transition_dipole_moment=True, surface_symmetrize=True,
+    f"{path}/{name}.op", get_transition_dipole_moment=False, surface_symmetrize=True,
             )
     # when we symmetrize the surfaces we divide the diagonal by 2 (that already happens and works correctly)
     A, N = vIO._extract_dimensions_from_dictionary(raw_model)
@@ -40,7 +40,7 @@ def vibronic_input_reader(name, hamiltonian_truncation_order, path):
 
     # model = vIO.load_model_from_JSON(f"{name}.json")
 
-    # model = vIO.model_remove_ground_state(model)
+    model = vIO.model_remove_ground_state(raw_model)
 
     # swap electron / vibrational dimensions
     vIO.prepare_model_for_cc_integration(raw_model,hamiltonian_truncation_order)

@@ -1,0 +1,61 @@
+OP_DEFINE-SECTION
+title
+IP
+end-title
+end-op_define-section
+
+
+PARAMETER-SECTION
+
+
+#        Frequencies
+# ------------------------
+
+w01                      =       0.2   , ev
+w02                      =       0.4   , ev
+
+#   Electronic Hamitonian
+#   Vertical energies - Zeropoint
+# -------------------------------
+
+EH_s01_s01               =      0.0000                 , ev
+EH_s02_s02               =      0.4000                 , ev
+EH_s03_s03               =      0.0000                 , ev
+
+#     Electronic transition moments
+# ----------------------------------
+Ex_s00_s01               =       0.100000    , ev
+Ex_s00_s02               =       0.100000    , ev
+#     Magnetic transition moments
+# ----------------------------------
+Mx_s00_s01               =       0.100000    , ev
+Mx_s00_s02               =       0.100000    , ev
+#  Linear Coupling Constants
+# --------------------------
+
+C1_s01_s01_v01           =       0.00    , ev
+C1_s02_s02_v01           =      -0.00    , ev
+C1_s01_s02_v02           =       0.08     , ev
+C1_s02_s01_v02           =       0.08     , ev
+
+
+#  Diagonal Quadratic Coupling Constants
+# --------------------------------------
+
+# Off_diagonal Quadratic Coupling Constants
+# -----------------------------------------
+
+#  Cubic Coupling Constants
+# --------------------------
+
+#  Quartic Coupling Constants
+# --------------------------
+
+#  Bi-Cubic Constants
+# --------------------------
+
+#  Bi-Quartic Constants
+# --------------------------
+
+
+end-parameter-section

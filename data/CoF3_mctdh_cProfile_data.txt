@@ -1,0 +1,54 @@
+Thu Mar 21 22:43:47 2024    CoF3_mctdh_cProfile_data
+
+         9027866 function calls (9023809 primitive calls) in 32.486 seconds
+
+   Ordered by: internal time
+   List reduced from 660 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+   972798   26.949    0.000   26.949    0.000 {built-in method numpy.core._multiarray_umath.c_einsum}
+    13326    1.219    0.000    2.613    0.000 vibronic_model_Hamiltonian.py:832(trans_DM)
+      370    0.575    0.002   32.306    0.087 rk.py:14(rk_step)
+  5263770    0.430    0.000    0.430    0.000 einsumfunc.py:1001(_einsum_dispatcher)
+   972798    0.273    0.000   27.222    0.000 einsumfunc.py:1009(einsum)
+     2221    0.231    0.000   31.721    0.014 vibronic_model_Hamiltonian.py:1121(rk45_solve_ivp_integration_function)
+    13326    0.204    0.000   20.007    0.002 vibronic_model_Hamiltonian.py:652(f_t_IJ)
+    13326    0.203    0.000    3.372    0.000 vibronic_model_Hamiltonian.py:713(f_z_IJ)
+   335397    0.168    0.000    0.168    0.000 {built-in method numpy.zeros}
+    13326    0.163    0.000    0.655    0.000 vibronic_model_Hamiltonian.py:626(f_t_Ij)
+
+
+Thu Mar 21 22:43:47 2024    CoF3_mctdh_cProfile_data
+
+         9027866 function calls (9023809 primitive calls) in 32.486 seconds
+
+   Ordered by: cumulative time
+   List reduced from 660 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      3/1    0.000    0.000   32.486   32.486 {built-in method builtins.exec}
+        1    0.000    0.000   32.486   32.486 <string>:1(<module>)
+        1    0.000    0.000   32.486   32.486 vibronic_model_Hamiltonian.py:1292(rk45_integration)
+        1    0.001    0.001   32.459   32.459 temporary_trial_solver.py:178(new_solve_ivp)
+      324    0.001    0.000   32.448    0.100 base.py:175(step)
+      324    0.009    0.000   32.447    0.100 rk.py:111(_step_impl)
+      370    0.575    0.002   32.306    0.087 rk.py:14(rk_step)
+     2221    0.005    0.000   31.741    0.014 base.py:152(fun)
+     2221    0.005    0.000   31.735    0.014 base.py:22(fun_wrapped)
+     2221    0.008    0.000   31.729    0.014 temporary_trial_solver.py:542(<lambda>)
+     2221    0.231    0.000   31.721    0.014 vibronic_model_Hamiltonian.py:1121(rk45_solve_ivp_integration_function)
+    13326    0.066    0.000   27.820    0.002 vibronic_model_Hamiltonian.py:737(cal_T_Z_residual)
+   972798    0.273    0.000   27.222    0.000 einsumfunc.py:1009(einsum)
+   972798   26.949    0.000   26.949    0.000 {built-in method numpy.core._multiarray_umath.c_einsum}
+    13326    0.054    0.000   23.016    0.002 vibronic_model_Hamiltonian.py:570(sim_trans_H)
+    13326    0.204    0.000   20.007    0.002 vibronic_model_Hamiltonian.py:652(f_t_IJ)
+    13326    0.029    0.000    4.050    0.000 vibronic_model_Hamiltonian.py:680(cal_net_residual)
+    13326    0.203    0.000    3.372    0.000 vibronic_model_Hamiltonian.py:713(f_z_IJ)
+    13326    0.026    0.000    3.347    0.000 vibronic_model_Hamiltonian.py:878(cal_q_variance)
+    13326    1.219    0.000    2.613    0.000 vibronic_model_Hamiltonian.py:832(trans_DM)
+
+
+Thu Mar 21 22:43:47 2024    CoF3_mctdh_cProfile_data
+
+         9027866 function calls (9023809 primitive calls) in 32.486 seconds
+

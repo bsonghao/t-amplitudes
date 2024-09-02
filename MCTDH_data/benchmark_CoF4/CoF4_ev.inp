@@ -1,0 +1,68 @@
+RUN-SECTION
+title = block improved CoF4 relaxation
+name = CoF4_ev
+relaxation=0,olsen precon=50 orben
+tout = 5.0 tfinal = 30.00
+rlxunit=eV, 0.0
+psi=double
+end-run-section
+
+OPERATOR-SECTION
+opname = CoF4_quadratic
+end-operator-section
+
+SPF-BASIS-SECTION
+packet=5, single-set
+      v01      =  2
+      v02      =  2
+      v03      =  2
+      v04      =  2
+      v05      =  2
+      v06      =  2
+      v07      =  2
+      v08      =  2
+      v09      =  2
+
+end-spf-basis-section
+
+PRIMITIVE-BASIS-SECTION
+    v01    HO     5   0.0   1.0   1.0
+    v02    HO     5   0.0   1.0   1.0
+    v03    HO     5   0.0   1.0   1.0
+    v04    HO     5   0.0   1.0   1.0
+    v05    HO     5   0.0   1.0   1.0
+    v06    HO     5   0.0   1.0   1.0
+    v07    HO     5   0.0   1.0   1.0
+    v08    HO     5   0.0   1.0   1.0
+    v09    HO     5   0.0   1.0   1.0
+    el     el     2
+
+end-primitive-basis-section
+
+INTEGRATOR-SECTION
+CMF/varphi = 0.5, 1.0d-08
+RK8/spf = 1.0d-8, 0.1
+rrDAV = 700, 1.0d-11
+end-integrator-section
+
+INIT_WF-SECTION
+build
+   init_state=2
+-----------------------------------------------------------
+#  mode   type  center  moment.  freq.    mass
+-----------------------------------------------------------
+    v01    HO     0.0    0.0      1.0     1.0
+    v02    HO     0.0    0.0      1.0     1.0
+    v03    HO     0.0    0.0      1.0     1.0
+    v04    HO     0.0    0.0      1.0     1.0
+    v05    HO     0.0    0.0      1.0     1.0
+    v06    HO     0.0    0.0      1.0     1.0
+    v07    HO     0.0    0.0      1.0     1.0
+    v08    HO     0.0    0.0      1.0     1.0
+    v09    HO     0.0    0.0      1.0     1.0
+-----------------------------------------------------------
+end-build
+autoblock
+end-init_wf-section
+
+end-input

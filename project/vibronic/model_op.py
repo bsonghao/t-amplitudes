@@ -33,8 +33,8 @@ headers = [
     'Electronic transition moments',
     'Magnetic transition moments',
     'Linear Coupling Constants',
-    'Diagonal Quadratic Coupling Constants',
-    'Off_diagonal Quadratic Coupling Constants',
+    'Quadratic Coupling Constants',
+    'Bilinear Coupling Constants',
     'Cubic Coupling Constants',
     'Quartic Coupling Constants',
     'Quintic Coupling Constants',
@@ -76,38 +76,11 @@ def extract_energies(path, memmap):
 
     # save the reference Hamiltonian into the energies array
     energies = np.zeros((A, A))
-
-    # this needs to be changed to support off-diagonal energy values
-    for a in range(A):  # old style
+    for a in range(A):
         list_of_words = lines[a].split()
         assert list_of_words[0] == f"EH_s{a+1:02}_s{a+1:02}", f"{list_of_words=}\nEH_s{a+1:02}_s{a+1:02}"
         assert list_of_words[-1] == "ev", f"{list_of_words[-1]=}"
         energies[a, a] = list_of_words[2]
-
-    # most likely we would use parse to process the lines
-    # this assumes that the first index is the row index and the second the column index
-    if False:
-        parse_pattern = "EH_s{a1:d}_s{a2:d}"
-        p = parse.compile(parse_pattern)
-        for line in lines:
-            if line is None:  # skip all empties
-                continue
-            if "EH" not in line:  # expect EH prefix
-                print(f"Line is malformed, missing EH?\n{line=}"); breakpoint()
-                raise Exception()
-
-            list_of_words = line.split()
-            assert list_of_words[-1] == "ev", f"Can only handle energy units in eV not {list_of_words[-1]=}"
-
-            r = p.parse(list_of_words[0])
-            assert r != None, f"Failed to parse\n{line=}\nInstead got {r=}? Line probably doesn't match the {parse_pattern=}"
-            try:
-                a1, a2 = r['a1'], r['a2']
-                energies[a1, a2] = float(list_of_words[2])
-            except TypeError as e:
-                print(r, line); breakpoint()
-                raise (str(e))
-
 
     return energies, A
 
@@ -243,6 +216,9 @@ def parse_lines(lines, coupling_terms, order=None):
     if order == 'C1':
         p = parse.compile("C1_s{a1:d}_s{a2:d}_v{j:d}")
         make_index_tuple = lambda r: (r['j']-1, r['a1']-1, r['a2']-1)
+    elif order == 'C1b':  # bilinear
+        p = parse.compile("C1b_s{a1:d}s{a2:d}_v{j1:d}v{j2:d}")
+        make_index_tuple = lambda r: (r['j1']-1, r['j2']-1, r['a1']-1, r['a2']-1)
     elif order == 'C2':
         p = parse.compile("C2_s{a1:d}s{a2:d}_v{j1:d}v{j2:d}")
         make_index_tuple = lambda r: (r['j1']-1, r['j2']-1, r['a1']-1, r['a2']-1)
@@ -270,16 +246,16 @@ def parse_lines(lines, coupling_terms, order=None):
         raise Exception("Order parameter can only take on the values {C1,C2,C3,C4,C5,C6,B3,B4,A4}")
 
     for line in lines:
-        if line is None:
-            continue
-        r = p.parse(line[0])
-        assert r != None, f"Failed to parse\n{line=}\nInstead got {r=}? Line probably doesn't match any parse patterns"
-        try:
-            index_tuple = make_index_tuple(r)
-        except TypeError as e:
-            print(r, line); breakpoint()
-            raise (str(e))
-        coupling_terms[index_tuple] = line[1]
+        if line is not None:
+            r = p.parse(line[0])
+            assert r is not None, f"Failed to parse\n{line=}\nInstead got {r=}? Line probably doesn't match any parse patterns for {order=}"
+            try:
+                index_tuple = make_index_tuple(r)
+            except TypeError as e:
+                print(r, line)
+                # breakpoint()
+                raise (str(e))
+            coupling_terms[index_tuple] = line[1]
 
     return
 
@@ -314,83 +290,52 @@ def extract_string_list(path, memmap, header_index=2):
 
 
 def extract_electronic_transition_dipole_moments(path, memmap, dipole_moments):
-    """calls extract_string_list() with appropriate parameters
-    so as to fill the dipole moments array with values from the *.op file
-
-    `dipole_moments` is an array of shape (C, A+1)
-        where C is the number of co-ordinates representing each atom (x,y,z => C = 3)
-        and the second dimension is the number of surfaces PLUS 1 (representing a fictitious ground state)
-    """
+    """calls extract_string_list() with appropriate parameters so as to fill the dipole moments array with values from the *.op file"""
     idx = headers.index('Electronic transition moments')
     lines = extract_string_list(path, memmap, header_index=idx)
 
-    for line in lines:
-        if 'au' in line:
-            print(lines)
-            #r = input("Does not support reading in units of A.U. / Hartrees\n Proceed ignoring units?")
-            #if r.lower() in ['y', 'yes']:
-            #    break
-            #else:
-            #    raise Exception()
+    coordinate_dimension = dipole_moments.shape[0]
+    exA = excited_electronic_dimension = dipole_moments.shape[1] - 1
+    nof_lines_expected = coordinate_dimension * excited_electronic_dimension
 
-    # define dimensions
-    C_dim = coordinate_dimension = dipole_moments.shape[0]
-    A_dim = excited_electronic_dimension = dipole_moments.shape[1] - 1
-
-    # double check
-    nof_lines_expected = C_dim * A_dim
     assert len(lines) == nof_lines_expected, (
         f"The file is malformed check the path {path}.\n"
-        f"We expected {nof_lines_expected=} lines but instead got {len(lines)}."
-        f"\nWe should have {excited_electronic_dimension=} values for each of the {coordinate_dimension=} dimensions"
+        f"We expected {nof_lines_expected} lines but instead got {len(lines)}."
+        f"\nWe should have {excited_electronic_dimension} values for each of the {coordinate_dimension} dimensions"
         "\nDid you not specify the correct number of dimensions?"
     )
 
-    # read in TDM values
     for c in range(coordinate_dimension):
         for a in range(excited_electronic_dimension):
-            label, number, *_ = lines[a + (c*A_dim)]
-            assert ('Ex' in label) or ('Ey' in label) or ('Ez' in label), f"{label=}{number=} does not contain Ex/Ey/Ez ?!\n{lines=}"
-            assert label[2:] == f"_s00_s{a+1:02}", f"Label is malformed? We expect \n{label[0:2]}_s00_s{a+1:02}\nbut got\n{label=}"
+            label, number, *_ = lines[a + (c*exA)]
+            assert ('Ex' in label) or ('Ey' in label) or ('Ez' in label)
+            assert label[2:] == f"_s00_s{a+1:02}"
             dipole_moments[c, a] = complex(number)
 
     return
 
 
 def extract_magnetic_transition_dipole_moments(path, memmap, dipole_moments):
-    """calls extract_string_list() with appropriate parameters
-    so as to fill the dipole moments array with values from the *.op file
-
-    `dipole_moments` is an array of shape (C, A+1)
-        where C is the number of co-ordinates representing each atom (x,y,z => C = 3)
-        and the second dimension is the number of surfaces PLUS 1 (representing a fictitious ground state)
-    """
+    """calls extract_string_list() with appropriate parameters so as to fill the dipole moments array with values from the *.op file"""
     idx = headers.index('Magnetic transition moments')
     lines = extract_string_list(path, memmap, header_index=idx)
 
-    for line in lines:
-        if 'au' in line:
-            print(lines)
-            #raise Exception("Does not support reading in units of A.U. / Hartrees")
+    coordinate_dimension = dipole_moments.shape[0]
+    exA = excited_electronic_dimension = dipole_moments.shape[1] - 1
+    nof_lines_expected = coordinate_dimension * excited_electronic_dimension
 
-    # define dimensions
-    C_dim = coordinate_dimension = dipole_moments.shape[0]
-    A_dim = excited_electronic_dimension = dipole_moments.shape[1] - 1
-
-    # double check
-    nof_lines_expected = C_dim * A_dim
     assert len(lines) == nof_lines_expected, (
         f"The file is malformed check the path {path}.\n"
-        f"We expected {nof_lines_expected=} lines but instead got {len(lines)}."
-        f"\nWe should have {excited_electronic_dimension=} values for each of the {coordinate_dimension=} dimensions"
+        f"We expected {nof_lines_expected} lines but instead got {len(lines)}."
+        f"\nWe should have {excited_electronic_dimension} values for each of the {coordinate_dimension} dimensions"
         "\nDid you not specify the correct number of dimensions?"
     )
 
     for c in range(coordinate_dimension):
         for a in range(excited_electronic_dimension):
-            label, number, *_ = lines[a + (c*A_dim)]
-            assert ('Mx' in label) or ('My' in label) or ('Mz' in label), f"{label=}{number=} does not contain Mx/My/Mz ?!\n{lines=}"
-            assert label[2:] == f"_s00_s{a+1:02}", f"Label is malformed? We expect \n{label[0:2]}_s00_s{a+1:02}\nbut got\n{label=}"
+            label, number, *_ = lines[a + (c*exA)]
+            assert ('Mx' in label) or ('My' in label) or ('Mz' in label)
+            assert label[2:] == f"_s00_s{a+1:02}"
             dipole_moments[c, a] = complex(number)
 
     return
@@ -406,17 +351,17 @@ def extract_linear_couplings(path, memmap, linear):
 
 def extract_quadratic_couplings(path, memmap, quadratic):
     """calls extract_string_list() with appropriate parameters so as to fill the quadratic coupling term array with values from the *.op file"""
-    idx = headers.index('Diagonal Quadratic Coupling Constants')
+    idx = headers.index('Quadratic Coupling Constants')
     lines = extract_string_list(path, memmap, header_index=idx)
     parse_lines(lines, quadratic, order='C2')
     return
 
 
-def extract_offdiagonal_quadratic_couplings(path, memmap, quadratic):
-    """calls extract_string_list() with appropriate parameters so as to fill the quadratic coupling term array with values from the *.op file"""
-    idx = headers.index('Off_diagonal Quadratic Coupling Constants')
+def extract_bilinear_couplings(path, memmap, quadratic):
+    """calls extract_string_list() with appropriate parameters so as to fill the quadratic/bilinear coupling term array with values from the *.op file"""
+    idx = headers.index('Bilinear Coupling Constants')
     lines = extract_string_list(path, memmap, header_index=idx)
-    parse_lines(lines, quadratic, order='C2')
+    parse_lines(lines, quadratic, order='C1b')
     return
 
 
@@ -524,7 +469,6 @@ def double_quadratic_terms(number_of_modes, States, quadratic_terms):
 def mode_symmetrize_from_lower_triangle_quadratic_terms(number_of_modes, States, quadratic_terms):
     """If the quadratic terms are zero in the upper triangle then we copy the lower triangle to the upper triangle and multiply the diagonal terms by 2.
     This assumes the values are in the lower triangle.
-    Note that the order of upper and lower triangle indices are slightly different so we need to reverse.
     """
 
     upper_triangle_idx = np.triu_indices(number_of_modes, k=1)
@@ -539,13 +483,12 @@ def mode_symmetrize_from_lower_triangle_quadratic_terms(number_of_modes, States,
             )
     else:
         for a, b in it.product(States, States):
-            quadratic_terms[(*reversed(lower_triangle_idx), a, b)] = quadratic_terms[(*lower_triangle_idx, a, b)]
+            quadratic_terms[(*upper_triangle_idx, a, b)] = quadratic_terms[(*lower_triangle_idx, a, b)]
 
 
 def mode_symmetrize_from_upper_triangle_quadratic_terms(number_of_modes, States, quadratic_terms):
     """If the quadratic terms are zero in the upper triangle then we copy the lower triangle to the upper triangle and multiply the diagonal terms by 2.
     This assumes the values are in the lower triangle.
-    Note that the order of upper and lower triangle indices are slightly different so we need to reverse.
     """
 
     upper_triangle_idx = np.triu_indices(number_of_modes, k=1)
@@ -559,7 +502,10 @@ def mode_symmetrize_from_upper_triangle_quadratic_terms(number_of_modes, States,
             )
     else:
         for a, b in it.product(States, States):
+            # quadratic_terms[(*lower_triangle_idx, a, b)] = quadratic_terms[(*upper_triangle_idx, a, b)]
             quadratic_terms[(*reversed(upper_triangle_idx), a, b)] = quadratic_terms[(*upper_triangle_idx, a, b)]
+
+    assert np.allclose(quadratic_terms, np.transpose(quadratic_terms, (1, 0, 2, 3)))
 
 
 def read_model_op_file(
@@ -568,7 +514,7 @@ def read_model_op_file(
         double_quadratic=False,
         symmetrize_quadratic=False,
         highest_order=1,
-        get_transition_dipole_moment=True,
+        get_transition_dipole_moment=False,
         dimension_of_dipole_moments=1
 ):
     """Reads/parses molecule_vibron.op file and returns a dictionary in the standard format defined in the package."""
@@ -648,8 +594,7 @@ def read_model_op_file(
                 extract_linear_couplings(path_file_op, mm, linear)
             if highest_order >= 2:
                 extract_quadratic_couplings(path_file_op, mm, quadratic)
-            if highest_order >= 2:
-                extract_offdiagonal_quadratic_couplings(path_file_op, mm, quadratic)
+                extract_bilinear_couplings(path_file_op, mm, quadratic)
             if highest_order >= 3:
                 extract_cubic_couplings(path_file_op, mm, cubic)
             if highest_order >= 4:
@@ -680,8 +625,8 @@ def read_model_op_file(
                     VMK.A: A,
                     VMK.E: excitation_energies,
                     VMK.w: frequencies,
-                    VMK.etdm: electronic_dipole_moments,
-                    VMK.mtdm: magnetic_dipole_moments,
+                    # VMK.etdm: electronic_dipole_moments,
+                    # VMK.mtdm: magnetic_dipole_moments,
                     }
 
     if highest_order >= 1:
