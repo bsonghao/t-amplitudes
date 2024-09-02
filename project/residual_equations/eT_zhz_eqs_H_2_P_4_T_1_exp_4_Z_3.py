@@ -46,7 +46,7 @@ def move_to_CPU(x):
 
 def get_numpy_R_back_from_GPU(x):
     """ temp func for exploring use of numpy/torch tensors """
-    return x.move_to_CPU(x).detach().numpy()
+    return move_to_CPU(x).detach().numpy()
 
 # ------------------------------------------------------------------------------------------------------------- #
 # --------------------------------------------- DEFAULT FUNCTIONS --------------------------------------------- #
@@ -1441,4 +1441,3 @@ def compute_all_optimized_paths(A, N, ansatz, truncation):
     all_opt_path_lists[(0, 3)] = compute_m0_n3_optimized_paths(A, N, ansatz, truncation)[(0, 3)]
 
     return all_opt_path_lists
-

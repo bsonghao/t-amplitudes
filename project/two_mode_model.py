@@ -10,7 +10,7 @@ from scipy.fftpack import fft
 import numpy as np
 # from numpy import newaxis as NEW
 # import matplotlib as mpl
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 # local imports
 # from .vibronic import vIO, VMK

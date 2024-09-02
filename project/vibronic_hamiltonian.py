@@ -17,8 +17,6 @@ import scipy
 # from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 import numpy as np
-import matplotlib as mpl; mpl.use('pdf')
-import matplotlib.pyplot as plt
 import parse  # used for loading data files
 #
 import opt_einsum as oe
