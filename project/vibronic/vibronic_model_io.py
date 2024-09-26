@@ -37,8 +37,8 @@ def model_shape_dict(A, N):
 
     """
     dictionary = {
-        VMK.etdm: (3, A),
-        VMK.mtdm: (3, A),
+        VMK.etdm: (1, A),
+        VMK.mtdm: (1, A),
         VMK.E: (A, A),
         VMK.w: (N, ),
         VMK.G1: (N, A, A),
@@ -73,8 +73,8 @@ def diagonal_model_shape_dict(A, N):
 
     """
     dictionary = {
-        VMK.etdm: (3, A),
-        VMK.mtdm: (3, A),
+        VMK.etdm: (1, A),
+        VMK.mtdm: (1, A),
         VMK.E: (A, ),
         VMK.w: (N, ),
         VMK.G1: (N, A),

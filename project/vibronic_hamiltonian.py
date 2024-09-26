@@ -63,6 +63,7 @@ class vibronic_hamiltonian(object):
             selected_surface=[],
             force_use_optimize=False,
             calculate_population_flag=True,
+            temperature=100
     ):
         """
         trans: ?
@@ -82,7 +83,7 @@ class vibronic_hamiltonian(object):
         # or for higher order terms
         nof_dimensions = self.A + self.N
 
-        self.op_einsum_flag = False
+        self.op_einsum_flag = True
 
         if force_use_optimize or (nof_dimensions >= 15):
             self.op_einsum_flag = True
@@ -96,6 +97,12 @@ class vibronic_hamiltonian(object):
 
         # flag to determine whether it is FC model
         self.FC = FC
+
+        # temperature of the simulation
+        self.temperature = temperature
+
+        # Boltzmann constant (eV K-1)
+        self.Kb = 8.61733326e-5
 
         # initialize truncation order of T, Z tensor
         self.Z_truncation_order = Z_truncation_order
@@ -154,7 +161,7 @@ class vibronic_hamiltonian(object):
 
         # ---------------------------------------------------------------------
 
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         # initialize derivative tensors
         self.dT = {
@@ -227,6 +234,8 @@ class vibronic_hamiltonian(object):
 
         # the majority of the work
         self._initialize_hamiltonian()
+        # bogoliubov transform the Hamiltonian
+        self.thermal_field_transform(self.temperature)
 
         # precompute optimal einsum paths to speed up integration
         if self.op_einsum_flag:
@@ -251,6 +260,99 @@ class vibronic_hamiltonian(object):
                 )
 
         return
+
+    def thermal_field_transform(self, T_ref):
+        """
+        conduct Bogoliubov transfrom of the physical hamiltonian
+        T_ref: temperature for the thermal field reference state
+        """
+        # calculate inverse temperature
+        self.T_ref = T_ref
+        beta = 1. / (self.Kb * T_ref)
+        # define Bogliubov transformation based on Bose-Einstein statistics
+        self.cosh_theta = 1. / np.sqrt((np.ones(self.N) - np.exp(-beta * self.model[VMK.w])))
+        self.sinh_theta = np.exp(-beta * self.model[VMK.w] / 2.) / np.sqrt(np.ones(self.N) - np.exp(-beta * self.model[VMK.w]))
+
+        # Bogliubov tranform that Hamiltonian
+        self.h_tilde = dict()
+
+        # constant terms
+        self.h_tilde[(0, 0)] = self.h[(0, 0)] + np.einsum('abii,i,i->ab', self.h[(1, 1)], self.sinh_theta, self.sinh_theta)
+
+        # linear termss
+        self.h_tilde[(1, 0)] = {
+                               "a": np.einsum('i,abi->abi', self.cosh_theta, self.h[(1, 0)]),
+                               "b": np.einsum('i,abi->abi', self.sinh_theta, self.h[(0, 1)])
+                               }
+
+        self.h_tilde[(0, 1)] = {
+                               "a": np.einsum('i,abi->abi', self.cosh_theta, self.h[(0, 1)]),
+                               "b": np.einsum('i,abi->abi', self.sinh_theta, self.h[(1, 0)])
+                               }
+
+        # quadratic terms
+        self.h_tilde[(1, 1)] = {
+                                "aa": np.einsum('i,j,abij->abij', self.cosh_theta, self.cosh_theta, self.h[(1, 1)]),
+                                "ab": np.einsum('i,j,abij->abij', self.cosh_theta, self.sinh_theta, self.h[(2, 0)]),
+                                "ba": np.einsum('i,j,abij->abij', self.sinh_theta, self.cosh_theta, self.h[(0, 2)]),
+                                "bb": np.einsum('i,j,abji->abij', self.sinh_theta, self.sinh_theta, self.h[(1, 1)])
+                               }
+
+        self.h_tilde[(2, 0)] = {
+                                "aa": np.einsum('i,j,abij->abij', self.cosh_theta, self.cosh_theta, self.h[(2, 0)]),
+                                "ab": np.einsum('i,j,abij->abij', self.cosh_theta, self.sinh_theta, self.h[(1, 1)]),
+                                "ba": np.einsum('i,j,abji->abij', self.sinh_theta, self.cosh_theta, self.h[(1, 1)]),
+                                "bb": np.einsum('i,j,abij->abij', self.sinh_theta, self.sinh_theta, self.h[(0, 2)]),
+                               }
+
+        self.h_tilde[(0, 2)] = {
+                                "aa": np.einsum('i,j,abij->abij', self.cosh_theta, self.cosh_theta, self.h[(0, 2)]),
+                                "ab": np.einsum('i,j,abji->abij', self.cosh_theta, self.sinh_theta, self.h[(1, 1)]),
+                                "ba": np.einsum('i,j,abij->abij', self.sinh_theta, self.cosh_theta, self.h[(1, 1)]),
+                                "bb": np.einsum('i,j,abij->abij', self.sinh_theta, self.sinh_theta, self.h[(2, 0)])
+                               }
+
+        log.info("###### Bogliubov transformed Hamiltonian ########")
+        for rank in self.h_tilde.keys():
+            if rank == (0, 0):
+                log.info("Rank:{:}\n{:}".format(rank, self.h_tilde[rank]))
+            else:
+                for block in self.h_tilde[rank].keys():
+                    log.info("Rank:{:} Block:{:}\n{:}".format(rank, block, self.h_tilde[rank][block]))
+
+        log.info("###### Merge blocks of the Bogoliubov transformed Hamiltonian")
+        self.h_tilde[(1, 0)] = self.merge_linear(self.h_tilde[(1, 0)])
+        self.h_tilde[(0, 1)] = self.merge_linear(self.h_tilde[(0, 1)])
+        self.h_tilde[(1, 1)] = self.merge_quadratic(self.h_tilde[(1, 1)])
+        self.h_tilde[(2, 0)] = self.merge_quadratic(self.h_tilde[(2, 0)])
+        self.h_tilde[(0, 2)] = self.merge_quadratic(self.h_tilde[(0, 2)])
+
+        log.info("##### Bogliubov transformed (fictitous) Hamiltonian after merge blocks ######")
+        for rank in self.h_tilde.keys():
+            log.info("Block {:}: \n {:}".format(rank, self.h_tilde[rank]))
+
+        return
+
+    def merge_linear(self, input_tensor):
+        """ merge linear terms of the Bogliubov transformed tensor """
+        A, N = self.A, self.N
+        output_tensor = np.zeros([A, A, 2 * N], dtype=complex)
+        for x, y in it.product(range(A), repeat=2):
+            output_tensor[x, y, :N] += input_tensor['a'][x, y, :]
+            output_tensor[x, y, N:] += input_tensor['b'][x, y, :]
+
+        return output_tensor
+
+    def merge_quadratic(self, input_tensor):
+        """ merge quadratic_terms of the Bogliubov transformed tensor """
+        A, N = self.A, self.N
+        output_tensor = np.zeros([A, A, 2 * N, 2 * N], dtype=complex)
+        for x, y in it.product(range(A), repeat=2):
+            output_tensor[x, y, :N, :N] += input_tensor["aa"][x, y, :]
+            output_tensor[x, y, :N, N:] += input_tensor["ab"][x, y, :]
+            output_tensor[x, y, N:, :N] += input_tensor["ba"][x, y, :]
+            output_tensor[x, y, N:, N:] += input_tensor["bb"][x, y, :]
+        return output_tensor
 
     def _check_truncation_info(self):
         """ Some debugging and output just to make sure we didn't pick conflicting values """
@@ -288,7 +390,7 @@ class vibronic_hamiltonian(object):
         """
 
         # ------------------------------------------------------------------------------------------------
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         # ostr = 'auto-hq'
         ostr = 'optimal'
@@ -479,11 +581,11 @@ class vibronic_hamiltonian(object):
         """Store optimized paths as member of `self` for use in the `eT_zhz_eqs_***` module during integration."""
 
         if self.Z_truncation_order == 1:
-            self.all_opt_paths = z_one_eqns.compute_all_optimized_paths(self.A, self.N, self.ansatz, self.gen_trunc)
+            self.all_opt_paths = z_one_eqns.compute_all_optimized_paths(self.A, 2*self.N, self.ansatz, self.gen_trunc)
         if self.Z_truncation_order == 2:
-            self.all_opt_paths = z_two_eqns.compute_all_optimized_paths(self.A, self.N, self.ansatz, self.gen_trunc)
+            self.all_opt_paths = z_two_eqns.compute_all_optimized_paths(self.A, 2*self.N, self.ansatz, self.gen_trunc)
         if self.Z_truncation_order == 3:
-            self.all_opt_paths = z_three_eqns.compute_all_optimized_paths(self.A, self.N, self.ansatz, self.gen_trunc)
+            self.all_opt_paths = z_three_eqns.compute_all_optimized_paths(self.A, 2*self.N, self.ansatz, self.gen_trunc)
 
         return
 
@@ -492,7 +594,7 @@ class vibronic_hamiltonian(object):
         This function should eventually  be replaced with someone more permanent.
         But for testing purposes for now its sufficient
         """
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         self.d0_opt_paths = [
             oe.contract_expression('k,yk->y', (N,), (A, N), optimize='auto-hq'),
@@ -518,7 +620,7 @@ class vibronic_hamiltonian(object):
         This function should eventually be replaced with someone more permanent.
         But for optimization for calculating Fe(CO)5 it is fine.
         """
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         self.cal_dT_Tran_C_paths = [
             oe.contract_expression('i,y->yi', (N,), (A,), optimize='auto-hq'),
@@ -533,7 +635,7 @@ class vibronic_hamiltonian(object):
         This function should eventually be replaced with someone more permanent.
         But for optimization for calculating Fe(CO)5 it is fine.
         """
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         self.H_bar_tilde_paths = [
             oe.contract_expression('k,abk->ab', (N,), (A, A, N), optimize='auto-hq'),
@@ -549,7 +651,7 @@ class vibronic_hamiltonian(object):
         This function should eventually be replaced with someone more permanent.
         But for optimization for calculating Fe(CO)5 it is fine.
         """
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         self.Cmat_Z0_opt_paths = [
             oe.contract_expression('k,xk->x', (N,), (A, N), optimize='auto-hq'),
@@ -703,7 +805,7 @@ class vibronic_hamiltonian(object):
         This is applied for each electronic surface.
         """
 
-        A, N = self.A, self.N   # for readability
+        A, N = self.A, 2*self.N   # for readability
 
         """ TO DO: """
         # rewrite residue for T to avoid permutations of electronic labels
@@ -787,11 +889,11 @@ class vibronic_hamiltonian(object):
 
             # initialize as zero
             R = np.zeros([A, A, N, N], dtype=complex)
-
+            R += H[(0, 2)]
             # if self.hamiltonian_truncation_order >= 2:
             # quadratic
             if self.T_truncation_order >= 2:
-                R += H[(0, 2)]
+                # R += H[(0, 2)]
                 pass
 
             return R
@@ -801,12 +903,13 @@ class vibronic_hamiltonian(object):
 
             # # initialize as zero
             R = np.zeros([A, A, N, N], dtype=complex)
+            R += H[(2, 0)]  # h term
 
             # if self.hamiltonian_truncation_order >= 2:
 
             # quadratic
             if self.T_truncation_order >= 2:
-                R += H[(2, 0)]  # h term
+                # R += H[(2, 0)]  # h term
                 R += np.einsum('abkj,ki->abij', H[(1, 1)], T[2])
                 R += np.einsum('abki,kj->abij', H[(1, 1)], T[2])
                 R += 0.5 * np.einsum('abkl,ki,lj->abij', H[(0, 2)], T[2], T[2])
@@ -954,7 +1057,7 @@ class vibronic_hamiltonian(object):
     def _unravel_y_tensor(self, y_tensor):
         """ Restore the original shape of the flattened y tensor """
 
-        A, N = self.A, self.N  # for brevity
+        A, N = self.A, 2*self.N  # for brevity
 
         # all return tensors start as None
         Z = {0: None, 1: None, 2: None, 3: None}
@@ -1141,8 +1244,8 @@ class vibronic_hamiltonian(object):
         # constant t residue
         dT = {
             0: complex(0.0),
-            1: np.zeros(self.N, dtype=complex),
-            2: np.zeros((self.N, self.N), dtype=complex)
+            1: np.zeros(2*self.N, dtype=complex),
+            2: np.zeros((2*self.N, 2*self.N), dtype=complex)
         }
 
         # single t residue
@@ -1165,8 +1268,8 @@ class vibronic_hamiltonian(object):
         # constant t residue
         dT = {
             0: complex(0.0),
-            1: np.zeros(self.N, dtype=complex),
-            2: np.zeros((self.N, self.N), dtype=complex)
+            1: np.zeros(2*self.N, dtype=complex),
+            2: np.zeros((2*self.N, 2*self.N), dtype=complex)
         }
 
         # single t residue
@@ -1183,7 +1286,7 @@ class vibronic_hamiltonian(object):
         """ compute z compute z residue by subtracting t residue from net residue
             adopt the new scheme the introduce similarity transform
         """
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         T_conj_1 = T_conj[(0, 1)]
 
@@ -1199,7 +1302,7 @@ class vibronic_hamiltonian(object):
             """calculate constant D_0"""
             assert self.Z_truncation_order >= 1, f"{self.Z_truncation_order=} < 1"
 
-            D_0 = np.zeros(self.A, dtype=complex)
+            D_0 = np.zeros(A, dtype=complex)
 
             if not self.op_einsum_flag:
                 D_0 += np.einsum('k,yk->y', T_conj_1, dz_1)
@@ -1221,7 +1324,7 @@ class vibronic_hamiltonian(object):
             """calculate single D_1"""
             assert self.Z_truncation_order >= 2, f"{self.Z_truncation_order=} < 2"
 
-            D_1 = np.zeros([self.A, self.N], dtype=complex)
+            D_1 = np.zeros([A, N], dtype=complex)
 
             if not self.op_einsum_flag:
                 D_1 += np.einsum('k,yki->yi', T_conj_1, dz_2)
@@ -1239,7 +1342,7 @@ class vibronic_hamiltonian(object):
             """calculate double D_2"""
             assert self.Z_truncation_order >= 3, f"{self.Z_truncation_order=} < 3"
 
-            D_2 = np.zeros([self.A, self.N, self.N], dtype=complex)
+            D_2 = np.zeros([A, N, N], dtype=complex)
 
             if not self.op_einsum_flag:
                 D_2 += 0.5 * np.einsum('l,ylij->yij', T_conj_1, dz_3)
@@ -1304,7 +1407,7 @@ class vibronic_hamiltonian(object):
         # calculate dz_3
         if self.Z_truncation_order >= 3:
             dz_3 = R[3] - X[(3, 0)]
-            dz_3 = symmetrize_tensor(self.N, dz_3, order=3)
+            dz_3 = symmetrize_tensor(2*self.N, dz_3, order=3)
         else:
             dz_3 = np.zeros([A, N, N, N], dtype=complex)
 
@@ -1317,7 +1420,7 @@ class vibronic_hamiltonian(object):
                 D_2 = _cal_D_2(T_conj_1, dz_3)
                 dz_2 -= D_2
 
-            dz_2 = symmetrize_tensor(self.N, dz_2, order=2)
+            dz_2 = symmetrize_tensor(2*self.N, dz_2, order=2)
         else:
             dz_2 = np.zeros([A, N, N], dtype=complex)
 
@@ -1472,7 +1575,7 @@ class vibronic_hamiltonian(object):
                     dz_ij -= (1.0 / 12.0) * np.einsum('k,l,m,ij,yklm->yij', T_conj[1], T_conj[1], T_conj[1], dT[2], Z[3])
 
             # symmetrize
-            dz_ij = symmetrize_tensor(self.N, dz_ij, order=2)
+            dz_ij = symmetrize_tensor(2*self.N, dz_ij, order=2)
 
             return dz_ij
 
@@ -1516,7 +1619,7 @@ class vibronic_hamiltonian(object):
                     dz_ijk -= (1.0 / 12.0) * np.einsum('l,m,lm,yijk->yijk', T_conj[1], T_conj[1], dT[2], Z[3])
 
             # symmetrize
-            dz_ijk = symmetrize_tensor(self.N, dz_ijk, order=3)
+            dz_ijk = symmetrize_tensor(2*self.N, dz_ijk, order=3)
 
             return dz_ijk
 
@@ -1809,7 +1912,7 @@ class vibronic_hamiltonian(object):
 
     def _cal_H_bar_tilde(self, input_tensor, T_conj, opt_flag=False):
         """calculate the second similarity transform the the Hamiltonian"""
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         def f_s_0(O_mat):
             """return constant residue"""
@@ -1878,7 +1981,7 @@ class vibronic_hamiltonian(object):
         It seems though that in the new scheme gen_Z is not used after the C_matrix is calculated.
         So in-theory we should be fine.
         """
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         def f_s_0(O_mat):
             """return constant residue"""
@@ -2256,7 +2359,7 @@ class vibronic_hamiltonian(object):
 
             return dT, dZ, C
 
-        A, N = self.A, self.N
+        A, N = self.A, 2*self.N
 
         # restore the origin shape of t, z amplitudes from y_tensor
         Z_unraveled, T_unraveled = self._unravel_y_tensor(y_tensor)
@@ -2332,7 +2435,7 @@ class vibronic_hamiltonian(object):
 
             # ## TO DO:
             # ## similarity transform the Hamiltonian over e^t
-            H_bar = self._similarity_trans(self.h, t_dict)
+            H_bar = self._similarity_trans(self.h_tilde, t_dict)
 
             # ## TO DO:
             # ## similarity transform the Hamiltonian over 1+Z and evaluate Z/T residue
@@ -2421,7 +2524,7 @@ class vibronic_hamiltonian(object):
             f"({t_init=} {t_final=} {density=} {nof_points=} {debug_flag=})"
         )
 
-        A, N = self.A, self.N  # to reduce line lengths, for conciseness
+        A, N = self.A, 2*self.N  # to reduce line lengths, for conciseness
 
         # used for debugging purposes to print out the integration steps every n% of integration
         self.counter = 0
