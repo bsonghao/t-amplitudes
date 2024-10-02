@@ -266,18 +266,19 @@ class vibronic_hamiltonian(object):
         conduct Bogoliubov transfrom of the physical hamiltonian
         T_ref: temperature for the thermal field reference state
         """
+        A, N = self.A, self.N
         # calculate inverse temperature
         self.T_ref = T_ref
         beta = 1. / (self.Kb * T_ref)
         # define Bogliubov transformation based on Bose-Einstein statistics
-        self.cosh_theta = 1. / np.sqrt((np.ones(self.N) - np.exp(-beta * self.model[VMK.w])))
-        self.sinh_theta = np.exp(-beta * self.model[VMK.w] / 2.) / np.sqrt(np.ones(self.N) - np.exp(-beta * self.model[VMK.w]))
+        self.cosh_theta = 1. / np.sqrt((np.ones(N) - np.exp(-beta * self.model[VMK.w])))
+        self.sinh_theta = np.exp(-beta * self.model[VMK.w] / 2.) / np.sqrt(np.ones(N) - np.exp(-beta * self.model[VMK.w]))
 
         # Bogliubov tranform that Hamiltonian
         self.h_tilde = dict()
 
         # constant terms
-        self.h_tilde[(0, 0)] = self.h[(0, 0)] + np.einsum('abii,i,i->ab', self.h[(1, 1)], self.sinh_theta, self.sinh_theta)
+        self.h_tilde[(0, 0)] = self.h[(0, 0)] + np.diag(np.diag(np.einsum('abii,i,i->ab', self.h[(1, 1)], self.sinh_theta, self.sinh_theta)))
 
         # linear termss
         self.h_tilde[(1, 0)] = {
@@ -331,6 +332,28 @@ class vibronic_hamiltonian(object):
         for rank in self.h_tilde.keys():
             log.info("Block {:}: \n {:}".format(rank, self.h_tilde[rank]))
 
+        log.info("##### Bogliubov transformed the GS hamiltonian######")
+
+        # calcuate Bogoliubov transformed h_0
+        self.h_tilde_0 = dict()
+        self.h_tilde_0[(0, 0)] = self.h_0[(0, 0)] + np.einsum('ii,i,i->', self.h_0[(1, 1)], self.sinh_theta, self.sinh_theta)
+
+        self.h_tilde_0[(1, 1)] = {
+        "aa": np.einsum('i,j,ij->ij', self.cosh_theta, self.cosh_theta, self.h_0[(1, 1)]),
+        "ab": np.zeros((N, N), dtype=complex),
+        'ba': np.zeros((N, N), dtype=complex),
+        "bb": np.einsum('i,j,ji->ij', self.sinh_theta, self.sinh_theta, self.h_0[(1, 1)])
+                   }
+        # log.info("h_11 unmerged")
+        # for key in self.h_tilde_0[(1, 1)].keys():
+            # log.info("Block {:}: \n {:}".format(key, self.h_tilde_0[(1, 1)][key]))
+
+        self.h_tilde_0[(1, 1)] = self.merge_quadratic(self.h_tilde_0[(1, 1)], h_0_flag=True)
+
+        # print("h_tilde_0:\n{:}".format(self.h_tilde_0[(1, 1)]))
+
+        log.info("##### Bogliubov transformed the GS hamiltonian completed ######")
+
         return
 
     def merge_linear(self, input_tensor):
@@ -343,16 +366,24 @@ class vibronic_hamiltonian(object):
 
         return output_tensor
 
-    def merge_quadratic(self, input_tensor):
+    def merge_quadratic(self, input_tensor, h_0_flag=False):
         """ merge quadratic_terms of the Bogliubov transformed tensor """
         A, N = self.A, self.N
-        output_tensor = np.zeros([A, A, 2 * N, 2 * N], dtype=complex)
-        for x, y in it.product(range(A), repeat=2):
-            output_tensor[x, y, :N, :N] += input_tensor["aa"][x, y, :]
-            output_tensor[x, y, :N, N:] += input_tensor["ab"][x, y, :]
-            output_tensor[x, y, N:, :N] += input_tensor["ba"][x, y, :]
-            output_tensor[x, y, N:, N:] += input_tensor["bb"][x, y, :]
-        return output_tensor
+        if h_0_flag:
+            output_tensor = np.zeros((2*N, 2*N), dtype=complex)
+            output_tensor[:N, :N] += input_tensor["aa"]
+            output_tensor[:N, N:] += input_tensor["ab"]
+            output_tensor[N:, :N] += input_tensor["ba"]
+            output_tensor[N:, N:] += input_tensor["bb"]
+            return output_tensor
+        else:
+            output_tensor = np.zeros([A, A, 2 * N, 2 * N], dtype=complex)
+            for x, y in it.product(range(A), repeat=2):
+                output_tensor[x, y, :N, :N] += input_tensor["aa"][x, y, :]
+                output_tensor[x, y, :N, N:] += input_tensor["ab"][x, y, :]
+                output_tensor[x, y, N:, :N] += input_tensor["ba"][x, y, :]
+                output_tensor[x, y, N:, N:] += input_tensor["bb"][x, y, :]
+            return output_tensor
 
     def _check_truncation_info(self):
         """ Some debugging and output just to make sure we didn't pick conflicting values """
@@ -771,6 +802,21 @@ class vibronic_hamiltonian(object):
 
         else:
             Exception("You shouldn't reach this point")
+
+        # initialize h_0
+        self.h_0 = {
+                    (0, 0): 0+0j,
+                    (1, 1): np.zeros((N, N), dtype=complex),
+                }
+
+        # H.O. ground state energy
+        self.h_0[(0, 0)] += 0.5 * np.sum(self.model[VMK.w])
+
+        # frequencies
+        for j in range(N):
+            self.h_0[(1, 1)][j, j] += self.model[VMK.w][j].copy()
+
+        # print("h_0 (1, 1):\n{:}".format(self.h_0[(1, 1)]))
 
         return
 
@@ -2095,6 +2141,66 @@ class vibronic_hamiltonian(object):
 
         return output_tensor
 
+    def _cal_c_h_0_tilde(self, c_args, surf):
+        """cal c*h_0_tilde"""
+        def cal_h_0_tilde():
+            """cal (e^t^dagger h_0)_f.c."""
+            def f_h_0_tilde_0():
+                """return constant residue"""
+                R = 0.
+                R += np.einsum('k,k->', T_conj[(0, 1)], self.h_tilde_0[(1, 0)])
+                R += 0.5 * np.einsum('k,l,kl->', T_conj[(0, 1)], T_conj[(0, 1)], self.h_tilde_0[(2, 0)])
+
+                return R
+
+            def f_h_0_tilde_Ij():
+                """return residue R_Ij"""
+                return self.h_tilde_0[(1, 1)]
+
+            output_tensor = {
+            (0, 0): f_s_0(input_tensor),
+            (1, 1): f_s_Ij(input_tensor),
+                }
+            return output_tensor
+
+        h_trans = cal_h_0_tilde
+
+        def cal_ch_0():
+            """constant"""
+            R = c_args[(0, 0)][surf] * self.h_tilde_0[(0, 0)]
+            return R
+
+        def cal_ch_1():
+            """singles"""
+            R = c_args[(1, 0)][surf,: ] * self.h_tilde_0[(0, 0)]
+            R += np.einsum('k,ik->i', c_args[(1, 0)][surf,: ], self.h_tilde_0[(1, 1)])
+
+            return R
+
+        def cal_ch_2():
+            """doubles"""
+            R = 0.5 * c_args[(2, 0)][surf,: ] * self.h_tilde_0[(0, 0)]
+            R += np.einsum('ik,jk->ij', c_args[2, 0][surf,: ], self.h_tilde_0[(1, 1)])
+
+            return R
+
+        def cal_ch_3():
+            """triples"""
+            R = 1./6. * c_args[(3, 0)][surf,: ] * self.h_tilde_0[(0, 0)]
+            R += 0.5 * np.einsum('ijl,kl->ijk', c_args[3, 0][surf,: ], self.h_tilde_0[(1, 1)])
+
+            return R
+
+        output_tensor = {}
+        output_tensor[(0, 0)] = cal_ch_0()
+        output_tensor[(1, 0)] = cal_ch_1()
+        if self.Z_truncation_order >= 2:
+            output_tensor[(2, 0)] = cal_ch_2()
+        if self.Z_truncation_order >= 3:
+            output_tensor[(3, 0)] = cal_ch_3()
+
+        return output_tensor
+
     def rk45_solve_ivp_integration_function(self, time, y_tensor, t_final):
         """ Integration function used by `solve_ivp` integrator inside `rk45_integration` method.
 
@@ -2167,7 +2273,9 @@ class vibronic_hamiltonian(object):
 
                 # compute H_bar_tilde matrix
                 H_bar_tilde = self._cal_H_bar_tilde(H_bar, _special_T_conj, opt_flag=opt_flag)
-                #print(f'Made H_bar_tilde, time: {time}')
+
+                # compute ch_0_tilde
+                ch_0_tilde = self._cal_c_h_0_tilde(C, b)
 
             # -------------------------------------
             # compute net residue
@@ -2218,6 +2326,9 @@ class vibronic_hamiltonian(object):
                         else:
                             z_three_eqns.add_m0_n0_HZ_terms_optimized(*args)
 
+                    # subtract h_0 contribution
+                    residual[0][b] -= ch_0_tilde[(0, 0)]
+
                 else:
                     args = (
                         A, N, self.ansatz, self.gen_trunc,
@@ -2253,6 +2364,8 @@ class vibronic_hamiltonian(object):
                                 z_three_eqns.gpu_add_m0_n1_HZ_terms_optimized(*args)
                             else:
                                 z_three_eqns.add_m0_n1_HZ_terms_optimized(*args)
+                        # substract h_0 contribution
+                        residual[1][b,: ] -= ch_0_tilde[(1, 0)]
                     else:
                         args = (
                             A, N, self.ansatz, self.gen_trunc,
@@ -2287,6 +2400,8 @@ class vibronic_hamiltonian(object):
                                 z_three_eqns.gpu_add_m0_n2_HZ_terms_optimized(*args)
                             else:
                                 z_three_eqns.add_m0_n2_HZ_terms_optimized(*args)
+                        # substract h_0 contribution
+                        residual[2][b,: ] -= ch_0_tilde[(2, 0)]
                     else:
                         args = (
                             A, N, self.ansatz, self.gen_trunc,
@@ -2325,6 +2440,8 @@ class vibronic_hamiltonian(object):
                                 z_three_eqns.gpu_add_m0_n3_HZ_terms_optimized(*args)
                             else:
                                 z_three_eqns.add_m0_n3_HZ_terms_optimized(*args)
+                        # substract h_0 contribution
+                        residual[3][b,: ] -= ch_0_tilde[(3, 0)]
                     else:
                         args = (
                             A, N, self.ansatz, self.gen_trunc,
