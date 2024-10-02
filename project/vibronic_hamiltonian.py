@@ -278,7 +278,7 @@ class vibronic_hamiltonian(object):
         self.h_tilde = dict()
 
         # constant terms
-        self.h_tilde[(0, 0)] = self.h[(0, 0)] + np.diag(np.diag(np.einsum('abii,i,i->ab', self.h[(1, 1)], self.sinh_theta, self.sinh_theta)))
+        self.h_tilde[(0, 0)] = self.h[(0, 0)] + np.einsum('abii,i,i->ab', self.h[(1, 1)], self.sinh_theta, self.sinh_theta)
 
         # linear termss
         self.h_tilde[(1, 0)] = {
@@ -344,11 +344,28 @@ class vibronic_hamiltonian(object):
         'ba': np.zeros((N, N), dtype=complex),
         "bb": np.einsum('i,j,ji->ij', self.sinh_theta, self.sinh_theta, self.h_0[(1, 1)])
                    }
+
+        self.h_tilde_0[(2, 0)] = {
+        "aa": np.zeros((N, N), dtype=complex),
+        "ab": np.einsum('i,j,ij->ij', self.cosh_theta, self.sinh_theta, self.h_0[(1, 1)]),
+        "ba": np.einsum('i,j,ji->ij', self.sinh_theta, self.cosh_theta, self.h_0[(1, 1)]),
+        "bb": np.zeros((N, N), dtype=complex)
+        }
+
+        self.h_tilde_0[(0, 2)] = {
+        "aa": np.zeros((N, N), dtype=complex),
+        "ab": np.einsum('i,j,ji->ij', self.cosh_theta, self.sinh_theta, self.h_0[(1, 1)]),
+        "ba": np.einsum('i,j,ij->ij', self.sinh_theta, self.cosh_theta, self.h_0[(1, 1)]),
+        "bb": np.zeros((N, N), dtype=complex)
+        }
         # log.info("h_11 unmerged")
         # for key in self.h_tilde_0[(1, 1)].keys():
             # log.info("Block {:}: \n {:}".format(key, self.h_tilde_0[(1, 1)][key]))
 
         self.h_tilde_0[(1, 1)] = self.merge_quadratic(self.h_tilde_0[(1, 1)], h_0_flag=True)
+        self.h_tilde_0[(2, 0)] = self.merge_quadratic(self.h_tilde_0[(2, 0)], h_0_flag=True)
+        self.h_tilde_0[(0, 2)] = self.merge_quadratic(self.h_tilde_0[(0, 2)], h_0_flag=True)
+
 
         # print("h_tilde_0:\n{:}".format(self.h_tilde_0[(1, 1)]))
 
@@ -2141,56 +2158,90 @@ class vibronic_hamiltonian(object):
 
         return output_tensor
 
-    def _cal_c_h_0_tilde(self, c_args, surf):
+    def _cal_c_h_0_tilde(self, c_args, T_conj, surf):
         """cal c*h_0_tilde"""
+        N = 2*self.N
         def cal_h_0_tilde():
             """cal (e^t^dagger h_0)_f.c."""
             def f_h_0_tilde_0():
                 """return constant residue"""
                 R = 0.
-                R += np.einsum('k,k->', T_conj[(0, 1)], self.h_tilde_0[(1, 0)])
+                R += self.h_tilde_0[(0, 0)]
+                # R += np.einsum("k,k->", T_conj[(0, 1)], self.h_tilde_0[(1, 0)])
                 R += 0.5 * np.einsum('k,l,kl->', T_conj[(0, 1)], T_conj[(0, 1)], self.h_tilde_0[(2, 0)])
 
                 return R
 
-            def f_h_0_tilde_Ij():
-                """return residue R_Ij"""
-                return self.h_tilde_0[(1, 1)]
+            def f_h_0_tilde_I():
+                """return residual R_I"""
+                R = np.zeros(N, dtype=complex)
+                R += np.einsum('k,ki->i', T_conj[(0, 1)], self.h_tilde_0[(2, 0)])
+
+                return R
+
+            def f_h_0_tilde_i():
+                """return residual R_i"""
+                R = np.zeros(N, dtype=complex)
+                R += np.einsum('k,ki->i', T_conj[(0, 1)], self.h_tilde_0[(1, 1)])
+
+                return R
 
             output_tensor = {
-            (0, 0): f_s_0(input_tensor),
-            (1, 1): f_s_Ij(input_tensor),
+            (0, 0): f_h_0_tilde_0(),
+            # (1, 0): f_h_0_tilde_I(),
+            # (0, 1): f_h_0_tilde_i(),
+            (2, 0): self.h_tilde_0[(2, 0)],
+            (0, 2): self.h_tilde_0[(0, 2)],
+            (1, 1): self.h_tilde_0[(1, 1)],
                 }
             return output_tensor
 
-        h_trans = cal_h_0_tilde
 
         def cal_ch_0():
             """constant"""
-            R = c_args[(0, 0)][surf] * self.h_tilde_0[(0, 0)]
+            R = 0.
+            R += c_args[(0, 0)][surf] * h_trans[(0, 0)]
+            # R += np.einsum('i,i->', c_args[(1, 0)][surf,: ], h_trans[(0, 1)])
+            R += 0.5 * np.einsum('ij,ij->', c_args[(2, 0)][surf,: ], h_trans[(0, 2)])
             return R
 
         def cal_ch_1():
             """singles"""
-            R = c_args[(1, 0)][surf,: ] * self.h_tilde_0[(0, 0)]
-            R += np.einsum('k,ik->i', c_args[(1, 0)][surf,: ], self.h_tilde_0[(1, 1)])
+            R = np.zeros(N, dtype=complex)
+            R += c_args[(1, 0)][surf,: ] * h_trans[(0, 0)]
+            # R += c_args[(0, 0)][surf] * h_trans[(1, 0)]
+            # R += np.einsum('ik,k->i', c_args[(2, 0)][surf,: ], h_trans[(0, 1)])
+            R += np.einsum('k,ik->i', c_args[(1, 0)][surf,: ], h_trans[(1, 1)])
+            if self.Z_truncation_order >= 3:
+                R += 0.5 * np.einsum('ikl,kl->i', c_args[(3, 0)][surf,: ], h_trans[(0, 2)])
 
             return R
 
         def cal_ch_2():
             """doubles"""
-            R = 0.5 * c_args[(2, 0)][surf,: ] * self.h_tilde_0[(0, 0)]
-            R += np.einsum('ik,jk->ij', c_args[2, 0][surf,: ], self.h_tilde_0[(1, 1)])
+            R = np.zeros((N, N), dtype=complex)
+            R += 0.5 * c_args[(2, 0)][surf,: ] * h_trans[(0, 0)]
+            R += 0.5 * c_args[(0, 0)][surf] * h_trans[(2, 0)]
+            # R += np.einsum('i,j->ij', c_args[(1, 0)][surf,: ], h_trans[(1, 0)])
+            R += np.einsum('ik,jk->ij', c_args[2, 0][surf,: ], h_trans[(1, 1)])
 
             return R
 
         def cal_ch_3():
             """triples"""
-            R = 1./6. * c_args[(3, 0)][surf,: ] * self.h_tilde_0[(0, 0)]
-            R += 0.5 * np.einsum('ijl,kl->ijk', c_args[3, 0][surf,: ], self.h_tilde_0[(1, 1)])
+            R = np.zeros((N, N, N), dtype=complex)
+            R += 1./6. * c_args[(3, 0)][surf,: ] * h_trans[(0, 0)]
+            R += 0.5 * np.einsum('i,jk->ijk', c_args[(1, 0)][surf,: ], h_trans[(2, 0)])
+            # R += 0.5 * np.einsum('ij,k->ijk', c_args[(2, 0)][surf,: ], h_trans[(1, 0)])
+            R += 0.5 * np.einsum('ijl,kl->ijk', c_args[3, 0][surf,: ], h_trans[(1, 1)])
 
             return R
 
+        # similarity transform h_0
+        h_trans = cal_h_0_tilde()
+
+
+        # cal C * h_trans
         output_tensor = {}
         output_tensor[(0, 0)] = cal_ch_0()
         output_tensor[(1, 0)] = cal_ch_1()
@@ -2275,7 +2326,7 @@ class vibronic_hamiltonian(object):
                 H_bar_tilde = self._cal_H_bar_tilde(H_bar, _special_T_conj, opt_flag=opt_flag)
 
                 # compute ch_0_tilde
-                ch_0_tilde = self._cal_c_h_0_tilde(C, b)
+                ch_0_tilde = self._cal_c_h_0_tilde(C, _special_T_conj, b)
 
             # -------------------------------------
             # compute net residue
@@ -2402,6 +2453,8 @@ class vibronic_hamiltonian(object):
                                 z_three_eqns.add_m0_n2_HZ_terms_optimized(*args)
                         # substract h_0 contribution
                         residual[2][b,: ] -= ch_0_tilde[(2, 0)]
+                        # symmetrize
+                        # residual[2] = symmetrize_tensor(2*self.N, residual[2], order=2)
                     else:
                         args = (
                             A, N, self.ansatz, self.gen_trunc,
@@ -2442,6 +2495,8 @@ class vibronic_hamiltonian(object):
                                 z_three_eqns.add_m0_n3_HZ_terms_optimized(*args)
                         # substract h_0 contribution
                         residual[3][b,: ] -= ch_0_tilde[(3, 0)]
+                        # symmetrize
+                        # residual[3] = symmetrize_tensor(2*self.N, residual[3], order=3)
                     else:
                         args = (
                             A, N, self.ansatz, self.gen_trunc,
@@ -2453,8 +2508,7 @@ class vibronic_hamiltonian(object):
                             args += (self.all_opt_paths[(0, 3)],)
                             residual[3] = z_three_eqns.compute_m0_n3_amplitude_optimized(*args)
 
-                # symmetrize
-                # residual[3] = symmetrize_tensor(self.N, residual[3], order=3)
+
 
             # --------------------------------------------------------------------------------
             if new_scheme_flag:
