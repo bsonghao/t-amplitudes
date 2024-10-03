@@ -56,7 +56,7 @@ def get_numpy_R_back_from_GPU(x):
 
 
 # -------------- operator(name='', rank=0, m=0, n=0) TERMS -------------- #
-def add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='', rank=0, m=0, n=0) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -78,7 +78,7 @@ def add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     return
 
 
-def gpu_add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def gpu_add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ temp fxn for testing gpu
     just wraps the add fxn and moves data from RAM to GPU and back
     """
@@ -89,12 +89,12 @@ def gpu_add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
     gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-    add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
-def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='', rank=0, m=0, n=0) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -150,7 +150,7 @@ def add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_
 
 
 # -------------- operator(name='b', rank=1, m=0, n=1) TERMS -------------- #
-def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='b', rank=1, m=0, n=1) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -176,7 +176,7 @@ def add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     return
 
 
-def gpu_add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def gpu_add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ temp fxn for testing gpu
     just wraps the add fxn and moves data from RAM to GPU and back
     """
@@ -187,12 +187,12 @@ def gpu_add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
     gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-    add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
-def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='b', rank=1, m=0, n=1) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -255,7 +255,7 @@ def add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_
 
 
 # -------------- operator(name='bb', rank=2, m=0, n=2) TERMS -------------- #
-def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='bb', rank=2, m=0, n=2) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -281,7 +281,7 @@ def add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     return
 
 
-def gpu_add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def gpu_add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ temp fxn for testing gpu
     just wraps the add fxn and moves data from RAM to GPU and back
     """
@@ -292,12 +292,12 @@ def gpu_add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
     gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-    add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
-def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='bb', rank=2, m=0, n=2) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -347,7 +347,7 @@ def add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_
 
 
 # -------------- operator(name='bbb', rank=3, m=0, n=3) TERMS -------------- #
-def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='bbb', rank=3, m=0, n=3) HZ terms.
     These terms have no vibrational contribution from the e^T operator.
     This reduces the number of possible non-zero permutations of creation/annihilation operators.
@@ -372,7 +372,7 @@ def add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_fun
     return
 
 
-def gpu_add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def gpu_add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ temp fxn for testing gpu
     just wraps the add fxn and moves data from RAM to GPU and back
     """
@@ -383,12 +383,12 @@ def gpu_add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum
     gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
     gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-    add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+    add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
     R = get_numpy_R_back_from_GPU(R_gpu)
     return
 
 
-def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func):
+def add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func):
     """ Calculate the operator(name='bbb', rank=3, m=0, n=3) eT_HZ terms.
     These terms include the vibrational contributions from the e^T operator.
     This increases the number of possible non-zero permutations of creation/annihilation operators.
@@ -437,12 +437,12 @@ def compute_m0_n0_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
         gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
         gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-        add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        add_m0_n0_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n0_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
+        add_m0_n0_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
         R = get_numpy_R_back_from_GPU(R_gpu)
     else:
-        add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
-        add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n0_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
+        add_m0_n0_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
     return R
 
 
@@ -464,12 +464,12 @@ def compute_m0_n1_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
         gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
         gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-        add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        add_m0_n1_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n1_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
+        add_m0_n1_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
         R = get_numpy_R_back_from_GPU(R_gpu)
     else:
-        add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
-        add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n1_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
+        add_m0_n1_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
     return R
 
 
@@ -492,12 +492,12 @@ def compute_m0_n2_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
         gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
         gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-        add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        add_m0_n2_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n2_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
+        add_m0_n2_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
         R = get_numpy_R_back_from_GPU(R_gpu)
     else:
-        add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
-        add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n2_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
+        add_m0_n2_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
     return R
 
 
@@ -521,12 +521,12 @@ def compute_m0_n3_amplitude(A, N, ansatz, truncation, t_args, h_args, z_args):
         gpu_h_args = {k: move_to_GPU_from_numpy(v) for k, v in h_args.items()}
         gpu_z_args = {k: move_to_GPU_from_numpy(v) for k, v in z_args.items()}
 
-        add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
-        add_m0_n3_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func)
+        add_m0_n3_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
+        add_m0_n3_eT_HZ_terms(R_gpu, ansatz, truncation, gpu_t_args, gpu_h_args, gpu_z_args, einsum_func=einsum_func)
         R = get_numpy_R_back_from_GPU(R_gpu)
     else:
-        add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
-        add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func)
+        add_m0_n3_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
+        add_m0_n3_eT_HZ_terms(R, ansatz, truncation, t_args, h_args, z_args, einsum_func=einsum_func)
     return R
 
 # ------------------------------------------------------------------------------------------------------------- #
