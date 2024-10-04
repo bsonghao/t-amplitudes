@@ -111,7 +111,7 @@ class vibronic_hamiltonian(object):
         if self.Z_truncation_order > 3:
             raise Exception('Only supports up to Z3 truncation, not Z4 or higher.')
 
-        if self.T_truncation_order > 1:
+        if self.T_truncation_order > 2:
             raise Exception('Only supports up to T1 truncation, not T2 or higher.')
 
         # ---------------------------------------------------------------------
@@ -138,8 +138,8 @@ class vibronic_hamiltonian(object):
 
         if T_truncation_order >= 1:
             self.gen_trunc.t_singles = True
-        if T_truncation_order >= 2:
-            assert False, 'Not supported yet'
+        # if T_truncation_order >= 2:
+            # assert False, 'Not supported yet'
 
         self.gen_trunc.z_at_least_linear = False
         self.gen_trunc.z_at_least_quadratic = False
@@ -831,9 +831,20 @@ class vibronic_hamiltonian(object):
 
         # frequencies
         for j in range(N):
-            self.h_0[(1, 1)][j, j] += self.model[VMK.w][j].copy()
+            self.h_0[(1, 1)][j, j] += self.model[VMK.w][j]
 
         # print("h_0 (1, 1):\n{:}".format(self.h_0[(1, 1)]))
+
+        # check hermicity of H
+        assert np.allclose(self.h[(1, 1)], np.transpose(self.h[(1, 1)],(1,0,3,2)))
+        assert np.allclose(self.h[(0, 0)], np.transpose(self.h[(0, 0)]))
+        assert np.allclose(self.h[(1, 0)], np.transpose(self.h[(1, 0)], (1,0,2)))
+        assert np.allclose(self.h[(0, 1)], np.transpose(self.h[(0, 1)], (1,0,2)))
+        if self.trunc.at_least_quadratic:
+            assert np.allclose(self.h[(2, 0)], np.transpose(self.h[(2, 0)],(1,0,3,2)))
+            assert np.allclose(self.h[(0, 2)], np.transpose(self.h[(0, 2)],(1,0,3,2)))
+
+
 
         return
 
@@ -1321,7 +1332,7 @@ class vibronic_hamiltonian(object):
 
         return dT
 
-    def _compute_t_residual_new(self, H_bar_tilde, C):
+    def _compute_t_residual_new(self, H_bar_tilde, C, cg):
         """compute t from Ehrenfest parameterization using the new scheme (weight C)"""
 
         C_0_conj = np.conj(C[(0, 0)])
@@ -1338,10 +1349,12 @@ class vibronic_hamiltonian(object):
         # single t residue
         if self.T_truncation_order >= 1:
             dT[1] += np.einsum('y,yxi,x->i', C_0_conj, H_bar_tilde[(1, 0)], C_0) / weight
+            dT[1] -= cg[(1, 0)]
 
         # double t residual_equation
         if self.T_truncation_order >= 2:
             dT[2] += np.einsum('y,yxij,x->ij', C_0_conj, H_bar_tilde[(2, 0)], C_0) / weight
+            dT[2] -= cg[(2, 0)]
 
         return dT
 
@@ -2167,7 +2180,6 @@ class vibronic_hamiltonian(object):
                 """return constant residue"""
                 R = 0.
                 R += self.h_tilde_0[(0, 0)]
-                # R += np.einsum("k,k->", T_conj[(0, 1)], self.h_tilde_0[(1, 0)])
                 R += 0.5 * np.einsum('k,l,kl->', T_conj[(0, 1)], T_conj[(0, 1)], self.h_tilde_0[(2, 0)])
 
                 return R
@@ -2179,20 +2191,11 @@ class vibronic_hamiltonian(object):
 
                 return R
 
-            def f_h_0_tilde_i():
-                """return residual R_i"""
-                R = np.zeros(N, dtype=complex)
-                R += np.einsum('k,ki->i', T_conj[(0, 1)], self.h_tilde_0[(1, 1)])
-
-                return R
 
             output_tensor = {
             (0, 0): f_h_0_tilde_0(),
             # (1, 0): f_h_0_tilde_I(),
-            # (0, 1): f_h_0_tilde_i(),
             (2, 0): self.h_tilde_0[(2, 0)],
-            (0, 2): self.h_tilde_0[(0, 2)],
-            (1, 1): self.h_tilde_0[(1, 1)],
                 }
             return output_tensor
 
@@ -2201,8 +2204,6 @@ class vibronic_hamiltonian(object):
             """constant"""
             R = 0.
             R += c_args[(0, 0)][surf] * h_trans[(0, 0)]
-            # R += np.einsum('i,i->', c_args[(1, 0)][surf,: ], h_trans[(0, 1)])
-            R += 0.5 * np.einsum('ij,ij->', c_args[(2, 0)][surf,: ], h_trans[(0, 2)])
             return R
 
         def cal_ch_1():
@@ -2210,10 +2211,6 @@ class vibronic_hamiltonian(object):
             R = np.zeros(N, dtype=complex)
             R += c_args[(1, 0)][surf,: ] * h_trans[(0, 0)]
             # R += c_args[(0, 0)][surf] * h_trans[(1, 0)]
-            # R += np.einsum('ik,k->i', c_args[(2, 0)][surf,: ], h_trans[(0, 1)])
-            R += np.einsum('k,ik->i', c_args[(1, 0)][surf,: ], h_trans[(1, 1)])
-            if self.Z_truncation_order >= 3:
-                R += 0.5 * np.einsum('ikl,kl->i', c_args[(3, 0)][surf,: ], h_trans[(0, 2)])
 
             return R
 
@@ -2223,7 +2220,6 @@ class vibronic_hamiltonian(object):
             R += 0.5 * c_args[(2, 0)][surf,: ] * h_trans[(0, 0)]
             R += 0.5 * c_args[(0, 0)][surf] * h_trans[(2, 0)]
             # R += np.einsum('i,j->ij', c_args[(1, 0)][surf,: ], h_trans[(1, 0)])
-            R += np.einsum('ik,jk->ij', c_args[2, 0][surf,: ], h_trans[(1, 1)])
 
             return R
 
@@ -2233,7 +2229,6 @@ class vibronic_hamiltonian(object):
             R += 1./6. * c_args[(3, 0)][surf,: ] * h_trans[(0, 0)]
             R += 0.5 * np.einsum('i,jk->ijk', c_args[(1, 0)][surf,: ], h_trans[(2, 0)])
             # R += 0.5 * np.einsum('ij,k->ijk', c_args[(2, 0)][surf,: ], h_trans[(1, 0)])
-            R += 0.5 * np.einsum('ijl,kl->ijk', c_args[3, 0][surf,: ], h_trans[(1, 1)])
 
             return R
 
@@ -2416,7 +2411,7 @@ class vibronic_hamiltonian(object):
                             else:
                                 z_three_eqns.add_m0_n1_HZ_terms_optimized(*args)
                         # substract h_0 contribution
-                        residual[1][b,: ] -= ch_0_tilde[(1, 0)]
+                        # residual[1][b,: ] -= ch_0_tilde[(1, 0)]
                     else:
                         args = (
                             A, N, self.ansatz, self.gen_trunc,
@@ -2452,7 +2447,10 @@ class vibronic_hamiltonian(object):
                             else:
                                 z_three_eqns.add_m0_n2_HZ_terms_optimized(*args)
                         # substract h_0 contribution
-                        residual[2][b,: ] -= ch_0_tilde[(2, 0)]
+                        if not self.T_truncation_order >= 2:
+                            residual[2][b,: ] -= ch_0_tilde[(2, 0)]
+                        else:
+                            pass
                         # symmetrize
                         # residual[2] = symmetrize_tensor(2*self.N, residual[2], order=2)
                     else:
@@ -2494,7 +2492,7 @@ class vibronic_hamiltonian(object):
                             else:
                                 z_three_eqns.add_m0_n3_HZ_terms_optimized(*args)
                         # substract h_0 contribution
-                        residual[3][b,: ] -= ch_0_tilde[(3, 0)]
+                        # residual[3][b,: ] -= ch_0_tilde[(3, 0)]
                         # symmetrize
                         # residual[3] = symmetrize_tensor(2*self.N, residual[3], order=3)
                     else:
@@ -2512,7 +2510,7 @@ class vibronic_hamiltonian(object):
 
             # --------------------------------------------------------------------------------
             if new_scheme_flag:
-                dT = self._compute_t_residual_new(H_bar_tilde, C)
+                dT = self._compute_t_residual_new(H_bar_tilde, C, ch_0_tilde)
             else:
                 dT = self._compute_t_residual(H_bar_tilde, Z, Z_conj_dict)
 
@@ -2744,15 +2742,15 @@ class vibronic_hamiltonian(object):
 
         # specify the precision of the integrator so that the output for the test models is numerically identical
         if self.comparing_to_test_models:
-            relative_tolerance = 1e-10
-            absolute_tolerance = 1e-12
+            relative_tolerance = 1e-5
+            absolute_tolerance = 1e-6
         else:
             # So the new "fix" does work but we need to up the tolerance parameters of the RK integrator to get agreement with MCTDH.
             # I would do at least 1e-9 and 1e-12, the issue is that the integrator simply takes too large steps based on the ode's represented by S_0
             # relative_tolerance = 1e-10
             # absolute_tolerance = 1e-12
             relative_tolerance = 1e-07
-            absolute_tolerance = 1e-09
+            absolute_tolerance = 1e-08
         # ------------------------------------------------------------------------
         # call the integrator
         # ------------------------------------------------------------------------
