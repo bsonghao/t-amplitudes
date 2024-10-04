@@ -1372,6 +1372,13 @@ class vibronic_hamiltonian(object):
                 (0, 0): np.einsum('k,k->', T_conj_1, dT[1]),
                 (1, 0): dT[1]
             }
+
+            if self.T_truncation_order >= 2:
+                output_tensor[(0, 0)] += 0.5 * np.einsum('k,l,kl->', T_conj_1, T_conj_1, dT[2])
+                output_tensor[(1, 0)] += np.einsum('k,ki->i', T_conj_1, dT[2])
+
+                output_tensor[(2, 0)] = dT[2]
+
             return output_tensor
 
         def _cal_D_0(T_conj_1, dz_1, dz_2, dz_3):
@@ -1458,6 +1465,8 @@ class vibronic_hamiltonian(object):
                 else:
                     R = np.einsum('i,yj->yij', dT_trans_1, C_1)
                     R += 0.5 * dT_trans_0 * C_2
+                if self.T_truncation_order >= 2:
+                    R += 0.5 * np.einsum('ij,y->yij', dT_trans[(2, 0)], C_0)
 
                 output_tensor[(2, 0)] = R
 
@@ -1469,6 +1478,8 @@ class vibronic_hamiltonian(object):
                 else:
                     R = 0.5 * np.einsum('i,yjk->yijk', dT_trans_1, C_2)
                     R += (1.0 / 6.0) * dT_trans_0 * C_3
+                if self.T_truncation_order >= 2:
+                    R += 0.5 * np.einsum('ij,yk->yijk', dT_trans[(2, 0)], C_1)
 
                 output_tensor[(3, 0)] = R
 
@@ -2492,7 +2503,7 @@ class vibronic_hamiltonian(object):
                             else:
                                 z_three_eqns.add_m0_n3_HZ_terms_optimized(*args)
                         # substract h_0 contribution
-                        # residual[3][b,: ] -= ch_0_tilde[(3, 0)]
+                        residual[3][b,: ] -= ch_0_tilde[(3, 0)]
                         # symmetrize
                         # residual[3] = symmetrize_tensor(2*self.N, residual[3], order=3)
                     else:
